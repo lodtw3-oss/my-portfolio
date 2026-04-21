@@ -4,7 +4,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid
 } from "recharts";
 
-// ─── 1. 配置與極致全螢幕樣式 ──────────────────────────────────────────
+// ?????? 1. ??????????????????????? ????????????????????????????????????????????????????????????????????????????????????
 const COLORS = ["#38bdf8", "#818cf8", "#34d399", "#fb923c", "#f472b6", "#facc15", "#a78bfa", "#2dd4bf"];
 const FINNHUB_KEY = "d6d8s6hr01qgk7ml1bogd6d8s6hr01qgk7ml1bp0"; 
 
@@ -18,15 +18,15 @@ const S = {
   content: { padding: "24px", flex: 1 },
   card: { background: "#0c1a2e", border: "1px solid #1a3050", borderRadius: 10, padding: 12, marginBottom: 12 },
   input: { background: "#07111e", border: "1px solid #1a3050", borderRadius: 6, color: "#dde3f0", padding: "10px", width: "100%", boxSizing: "border-box" },
-  table: { width: "100%", borderCollapse: "collapse", fontSize: "0.9rem", marginTop: 15 },
+  table: { width: "100%", borderCollapse: "collapse", fontSize: "0.9rem", marginTop: 15, tableLayout: "auto" },
   th: { textAlign: "left", padding: "6px", color: "#4a6080", borderBottom: "1px solid #1a3050", fontSize: "0.72rem" },
   td: { padding: "6px", borderBottom: "1px solid #0b1629", fontSize: '0.9rem' },
   
   btn: (v) => ({ padding: "8px 16px", borderRadius: 6, border: "none", cursor: "pointer", fontWeight: 700, background: v === "primary" ? "#0ea5e9" : v === "danger" ? "#ef4444" : "#1e293b", color: "#fff" }),
-  gapBadge: (gap) => ({ padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", background: Math.abs(gap) > 5 ? "#ef444433" : "#22c55e33", color: Math.abs(gap) > 5 ? "#ef4444" : "#22c55e", fontWeight: "bold" })
+  gapBadge: (gap) => ({ padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", background: gap > 0 ? "#10b98133" : gap < 0 ? "#ef444433" : "transparent", color: gap > 0 ? "#10b981" : gap < 0 ? "#ef4444" : "#94a3b8", fontWeight: "bold" })
 };
 
-// ─── 2. 數據處理工具 ────────────────────────────────────────────────────────
+// ?????? 2. ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 const fmt = (v, d = 0) => new Intl.NumberFormat("zh-TW", { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
 
 async function fetchFinanceData(symbol, market) {
@@ -46,7 +46,7 @@ async function fetchFinanceData(symbol, market) {
   } catch { return null; }
 }
 
-// ─── 3. 主程式 ────────────────────────────────────────────────────────────
+// ?????? 3. ??????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 export default function App() {
   const [portfolios, setPortfolios] = useState([]);
   const [history, setHistory] = useState([]);
@@ -62,11 +62,11 @@ export default function App() {
   const [expandedHistory, setExpandedHistory] = useState(null);
   const [editingEntry, setEditingEntry] = useState(null);
   const [editingPortfolio, setEditingPortfolio] = useState(null);
+  const [editingSnapshot, setEditingSnapshot] = useState(null);
   const [lastRetentionDate, setLastRetentionDate] = useState(null);
 
-  // 建立快照物件（包含各組合明細）
+  // Build a snapshot from current portfolios
   const buildSnapshotFromPortfolios = (pArray) => {
-    const tsNow = new Date().toISOString();
     const date = tsNow.split('T')[0];
     const breakdown = (pArray || []).map(p => ({
       id: p.id,
@@ -103,28 +103,28 @@ export default function App() {
 
     fetch("https://open.er-api.com/v6/latest/USD").then(r => r.json()).then(d => setUsdtwd(d.rates.TWD));
 
-    // 每分鐘檢查：保留每日 14:00 快照以及在台北時間 00:00 做前一日保留策略
+    // Auto-create daily snapshots at 14:00 and run retention at 00:00 Taipei time
     const timer = setInterval(() => {
-      const now = Date.now();
       // Taipei time = UTC +8
       const taipeiNow = new Date(now + 8 * 3600000);
       const th = taipeiNow.getUTCHours();
       const tm = taipeiNow.getUTCMinutes();
 
-      // 原先每日 14:00 的自動快照（以 taipei 時間判斷）
+      // Create a daily snapshot at 14:00 Taipei time
       if (th === 14 && tm === 0) {
-        const pLocal = JSON.parse(localStorage.getItem("v6_p") || "[]");
         const snap = buildSnapshotFromPortfolios(pLocal);
         const hLocal = JSON.parse(localStorage.getItem("v6_h") || "[]");
         const newH = [...hLocal, snap];
         setHistory(newH);
         localStorage.setItem("v6_h", JSON.stringify(newH));
+        // ??????????????????????CSV
+        exportDailySnapshotCSV(snap);
       }
 
-      // 每日台北 00:00 執行保留策略（只執行一次）
+      // ????????? 00:00 ???????????????????????????????????
       const taipeiDateStr = taipeiNow.toISOString().split('T')[0];
       if (th === 0 && tm === 0 && lastRetentionDate !== taipeiDateStr) {
-        // prev date (台北昨日)
+        // prev date (???????)
         const prevDate = new Date(now + 8 * 3600000 - 24 * 3600000);
         const prevDateStr = prevDate.toISOString().split('T')[0];
         const hLocal = JSON.parse(localStorage.getItem('v6_h') || '[]');
@@ -181,14 +181,42 @@ export default function App() {
     return head + '\n' + body;
   };
 
-  const downloadCSV = (filename, content) => {
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+  const downloadCSV = async (filename, content) => {
+    try {
+      // ??????????????????????????????????????????????????
+      const base = (typeof window !== 'undefined' && window && window.location && window.location.hostname === 'localhost') ? 'http://localhost:4000' : '';
+      const response = await fetch(`${base}/api/save-csv`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ filename, content }),
+      });
+
+      if (response.ok) {
+        console.log(`CSV saved to record folder: ${filename}`);
+        // ????????????????????????????????
+        // alert(`CSV?????????????????????????????????d???: ${filename}`);
+      } else {
+        console.error('Failed to save CSV to server');
+        // fallback: download CSV directly in the browser
+        const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      console.error('Error saving CSV:', e);
+      // fallback: download CSV directly in the browser
+      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
   };
 
   const exportPortfoliosCSV = () => {
@@ -218,6 +246,48 @@ export default function App() {
     }));
     const csv = toCSV(rows, ['date','ts','value','breakdown']);
     downloadCSV('snapshots.csv', csv);
+  };
+
+  // ???????????????????CSV
+  const exportDailySnapshotCSV = (snap) => {
+    if (!snap) return;
+    const ts = new Date().toISOString().replace(/[:.]/g,'-');
+    const filename = `daily_snapshot_${snap.date}_${ts}.csv`;
+    
+    // ???????????????????????
+    const rows = [{
+      date: snap.date,
+      timestamp: snap.ts,
+      totalValue: snap.value,
+      portfolioCount: (snap.breakdown || []).length
+    }];
+    
+    // ????????????????????????????????
+    (snap.breakdown || []).forEach(p => {
+      rows.push({
+        portfolioId: p.id,
+        portfolioName: p.name,
+        portfolioValue: p.value,
+        entryCount: (p.entries || []).length
+      });
+      
+      // ??????????????????????????
+      (p.entries || []).forEach(e => {
+        rows.push({
+          entryId: e.id,
+          symbol: e.symbol,
+          type: e.type,
+          shares: e.shares,
+          currentPrice: e.currentPrice,
+          change: e.change,
+          valueTWD: e.valueTWD,
+          targetPct: e.targetPct
+        });
+      });
+    });
+    
+    const csv = toCSV(rows, ['date','timestamp','totalValue','portfolioCount','portfolioId','portfolioName','portfolioValue','entryCount','entryId','symbol','type','shares','currentPrice','change','valueTWD','targetPct']);
+    downloadCSV(filename, csv);
   };
 
   const parseCSV = (text) => {
@@ -312,25 +382,26 @@ export default function App() {
         }
         save(newPortfolios);
         setTab('portfolios');
-        alert('匯入成功，已更新本地組合資料');
-      } catch { alert('匯入失敗：檔案格式可能不正確'); }
+        alert('匯入成功！');
+      } catch { alert('匯入失敗。請檢查檔案格式後再試一次。'); }
       // reset input
       ev.target.value = '';
     };
     reader.readAsText(f, 'utf-8');
   };
 
-  // 手動快照：立刻建立完整快照並加入歷史（每次新增，不覆蓋）
+  // ?????????????????????????????????????????????????????????????????????????
   const manualSnapshot = () => {
     const snap = buildSnapshotFromPortfolios(portfolios);
     const newH = [...history, snap];
     setHistory(newH);
     localStorage.setItem("v6_h", JSON.stringify(newH));
+    // ??????????????????????CSV
+    exportDailySnapshotCSV(snap);
   };
 
-  // 手動更新即時數據：抓取每個 entry 的即時價格與漲跌，更新 portfolios 並儲存
+  // Refresh prices for all entries in the selected portfolio
   const manualRefresh = async () => {
-    setLoading(true);
     try {
       const pLocal = JSON.parse(localStorage.getItem('v6_p') || '[]');
       const updated = await Promise.all(pLocal.map(async (p) => {
@@ -339,7 +410,7 @@ export default function App() {
           const data = await fetchFinanceData(e.symbol, e.type);
           if (!data) return e;
           const rate = e.type === 'US' ? usdtwd : 1;
-          const price = data.price || e.currentPrice || 0;
+          const price = (data.price ?? e.currentPrice) || 0;
           return { ...e, currentPrice: price, change: data.change || e.change || 0, valueTWD: Number((Number(e.shares || 0) * price * rate).toFixed(2)) };
         }));
         const total = newEntries.reduce((s, x) => s + (x.valueTWD || 0), 0);
@@ -353,21 +424,20 @@ export default function App() {
     setLoading(false);
   };
 
-  // 編輯 entry：啟動、取消、儲存
+  // Start editing an entry
   const startEditEntry = (pId, e) => {
-    setEditingEntry({ pId, id: e.id, symbol: e.symbol, shares: e.shares, type: e.type });
   };
   const cancelEditEntry = () => setEditingEntry(null);
   const commitEditEntry = () => {
     if (!editingEntry) return;
-    // 驗證 shares 必須為數字且 >= 0
+    // ???? shares ??????????????????? >= 0
     const sharesNum = Number(editingEntry.shares);
     if (isNaN(sharesNum) || sharesNum < 0) {
-      window.alert('持有股數/金額必須為非負數');
+      window.alert('股數必須是大於或等於 0 的數字。');
       return;
     }
     if (editingEntry.type !== 'cash' && (!editingEntry.symbol || editingEntry.symbol.trim() === '')) {
-      window.alert('股票代號不可為空');
+      window.alert('??????????????????????');
       return;
     }
     const updated = portfolios.map(p => {
@@ -388,13 +458,13 @@ export default function App() {
     setEditingEntry(null);
   };
 
-  // 組合名稱編輯
+  // ????????????????????
   const startEditPortfolio = (p) => setEditingPortfolio({ id: p.id, name: p.name });
   const cancelEditPortfolio = () => setEditingPortfolio(null);
   const commitEditPortfolio = () => {
     if (!editingPortfolio) return;
     if (!editingPortfolio.name || editingPortfolio.name.trim() === '') {
-      window.alert('組合名稱不可為空');
+      window.alert('????????????????????');
       return;
     }
     const updated = portfolios.map(p => p.id === editingPortfolio.id ? { ...p, name: editingPortfolio.name } : p);
@@ -403,16 +473,16 @@ export default function App() {
   };
 
   const handleAddEntry = async () => {
-    // 驗證輸入
+    // ?????????????????????
     if (entry.type !== "cash") {
-      if (!entry.symbol || entry.symbol.trim() === '') { window.alert('股票代號不可為空'); return; }
-      if (isNaN(Number(entry.shares)) || Number(entry.shares) <= 0) { window.alert('持有股數必須為大於 0 的數字'); return; }
+      if (!entry.symbol || entry.symbol.trim() === '') { window.alert('??????????????????????'); return; }
+      if (isNaN(Number(entry.shares)) || Number(entry.shares) <= 0) { window.alert('Shares must be greater than 0.'); return; }
     } else {
-      if (isNaN(Number(entry.cash)) || Number(entry.cash) <= 0) { window.alert('現金金額必須為大於 0 的數字'); return; }
+      if (isNaN(Number(entry.cash)) || Number(entry.cash) <= 0) { window.alert('Cash amount must be greater than 0.'); return; }
     }
     setLoading(true);
     const data = await fetchFinanceData(entry.symbol, entry.type);
-    const price = data?.price || (entry.type === "cash" ? 1 : Number(window.prompt("抓取失敗，請輸入價格:")));
+    const price = data?.price ?? (entry.type === "cash" ? 1 : Number(window.prompt("?????????????????????????????????????")));
     
     if (price) {
       const rate = entry.type === "US" ? usdtwd : 1;
@@ -433,26 +503,26 @@ export default function App() {
         <div style={S.logo}>PORTFOLIO X-STREAM</div>
         <div style={{display:'flex', gap:10, alignItems:'center'}}>
           <div style={{fontSize:'0.82rem'}}>USD/TWD: <b style={{color:'#38bdf8'}}>{usdtwd.toFixed(2)}</b></div>
-            <button style={{...S.btn('primary')}} onClick={async () => { if (!loading) await manualRefresh(); }} disabled={loading}>{loading? '更新中...' : '更新即時數據'}</button>
-            <button style={{...S.btn()}} onClick={() => exportPortfoliosCSV()}>匯出組合 CSV</button>
-            <button style={{...S.btn()}} onClick={() => exportHistoryCSV()}>匯出快照 CSV</button>
+            <button style={{...S.btn('primary')}} onClick={async () => { if (!loading) await manualRefresh(); }} disabled={loading}>{loading ? '更新中...' : '更新價格'}</button>
+            <button style={{...S.btn()}} onClick={() => exportPortfoliosCSV()}>匯出投資組合 CSV</button>
+            <button style={{...S.btn()}} onClick={() => exportHistoryCSV()}>匯出歷史紀錄 CSV</button>
             <input id="importPortfoliosInput" type="file" accept=".csv" style={{display:'none'}} onChange={handleImportPortfoliosFile} />
-            <button style={{...S.btn()}} onClick={() => document.getElementById('importPortfoliosInput').click()}>匯入組合 CSV</button>
+            <button style={{...S.btn()}} onClick={() => document.getElementById('importPortfoliosInput').click()}>匯入投資組合 CSV</button>
         </div>
       </header>
 
       <nav style={S.nav}>
-        <button style={S.navBtn(tab === "portfolios")} onClick={() => setTab("portfolios")}>資產庫</button>
         <button style={S.navBtn(tab === "add")} onClick={() => setTab("add")}>新增資產</button>
-        <button style={S.navBtn(tab === "history")} onClick={() => setTab("history")}>快照歷史</button>
-        <button style={S.navBtn(tab === "analysis")} onClick={() => setTab("analysis")}>資產分析</button>
+        <button style={S.navBtn(tab === "portfolios")} onClick={() => setTab("portfolios")}>投資組合</button>
+        <button style={S.navBtn(tab === "history")} onClick={() => setTab("history")}>歷史紀錄</button>
+        <button style={S.navBtn(tab === "analysis")} onClick={() => setTab("analysis")}>分析</button>
       </nav>
 
       <main style={S.content}>
         {tab === "portfolios" && (
-          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(450px, 1fr))', gap:'20px'}}>
+          <div style={{display:'flex', flexDirection:'column', gap:'20px', maxHeight:'calc(100vh - 200px)', overflowY:'auto'}}>
             {portfolios.map(p => (
-              <div key={p.id} style={S.card}>
+              <div key={p.id} style={{...S.card, width:'100%'}}>
                 <div style={{display:'flex', justifyContent:'space-between', marginBottom:10, alignItems:'center'}}>
                   <div style={{display:'flex', gap:8, alignItems:'center'}}>
                     {editingPortfolio && String(editingPortfolio.id) === String(p.id) ? (
@@ -469,47 +539,48 @@ export default function App() {
                       <button style={{...S.btn('primary'), padding:'6px 10px'}} onClick={() => startEditPortfolio(p)}>編輯名稱</button>
                     )}
                   </div>
-                  <button style={S.btn('danger')} onClick={() => save(portfolios.filter(x=>x.id!==p.id))}>移除</button>
+                  <button style={S.btn('danger')} onClick={() => save(portfolios.filter(x=>x.id!==p.id))}>刪除</button>
                 </div>
                 <div style={{fontSize:'2rem', fontWeight:900, color:'#38bdf8'}}>NT$ {fmt(p.totalTWD)}</div>
                 
                  <button style={{...S.btn('primary'), width:'100%', marginTop:15}} onClick={() => setExpandedAll(!expandedAll)}>
-                   {expandedAll ? "收合細節" : "查看詳細比例與差距"}
+                   {expandedAll ? "收合" : "展開所有資產"}
                  </button>
 
                  {expandedAll && (
-                  <table style={S.table}>
-                    <thead>
-                      <tr>
-                        <th style={S.th}>項目</th>
-                        <th style={S.th}>持有股數</th>
-                        <th style={S.th}>目前市價</th>
-                        <th style={S.th}>漲跌幅</th>
-                        <th style={S.th}>實際 %</th>
-                        <th style={S.th}>目標 %</th>
-                        <th style={S.th}>差距</th>
-                        <th style={S.th}>價值 (TWD)</th>
-                        <th style={S.th}>分析</th>
-                        <th style={S.th}>建議股數變化</th>
-                        <th style={S.th}>操作</th>
-                      </tr>
-                    </thead>
+                  <div style={{width: '100%'}}>
+                    <table style={{...S.table}}>
+                      <thead>
+                        <tr>
+                          <th style={{...S.th}}>代號</th>
+                          <th style={{...S.th}}>持有數</th>
+                          <th style={{...S.th}}>現價</th>
+                          <th style={{...S.th}}>報酬率 %</th>
+                          <th style={{...S.th}}>目前占比 %</th>
+                          <th style={{...S.th}}>目標占比 %</th>
+                          <th style={{...S.th}}>差距</th>
+                          <th style={{...S.th}}>價值 (TWD)</th>
+                          <th style={{...S.th}}>預估變動</th>
+                          <th style={{...S.th}}>建議股數</th>
+                          <th style={{...S.th}}>操作</th>
+                        </tr>
+                      </thead>
                     <tbody>
                       {p.entries.map(e => {
                         const actualPct = (e.valueTWD / p.totalTWD) * 100;
                         const gap = actualPct - e.targetPct;
                         const rate = e.type === 'US' ? usdtwd : 1;
                         let suggestedNum = null;
-                        let suggestedText = '—';
+                        let suggestedText = '-';
                         if (e.type !== 'cash' && e.currentPrice) {
                           const desiredValue = p.totalTWD * (Number(e.targetPct) / 100);
                           const desiredShares = desiredValue / (e.currentPrice * rate);
                           const currentShares = Number(e.shares) || 0;
                           const delta = desiredShares - currentShares;
-                          suggestedNum = Math.round(delta); // 取整建議股數
+                          suggestedNum = Math.round(delta); // ?????????????????????
                           suggestedText = (suggestedNum >= 0 ? '+' : '') + suggestedNum;
                         }
-                        // 資產分析：估計價值變動 (以當日變動百分比計算)
+                        // ??????????????????????????????????????(??????????????????????)
                         const estChangePct = e.change || 0;
                         const estChangeTWD = e.valueTWD * (estChangePct / 100);
                         const isEditing = editingEntry && String(editingEntry.id) === String(e.id) && String(editingEntry.pId) === String(p.id);
@@ -544,6 +615,7 @@ export default function App() {
                       })}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
             ))}
@@ -553,37 +625,37 @@ export default function App() {
         {tab === "add" && (
           <div style={{display:'flex', gap:'24px'}}>
             <div style={{...S.card, flex:1}}>
-              <h3>1. 設定組合名稱</h3>
-              <input style={{...S.input, marginBottom:20}} value={pName} onChange={e => setPName(e.target.value)} placeholder="如：長期領息組合" />
+              <h3>1. 建立投資組合</h3>
+              <input style={{...S.input, marginBottom:20}} value={pName} onChange={e => setPName(e.target.value)} placeholder="輸入投資組合名稱" />
               
               <div style={{background:'#07111e', padding:20, borderRadius:8}}>
-                <h4 style={{marginTop:0}}>2. 加入單一資產</h4>
+                <h4 style={{marginTop:0}}>2. 新增資產</h4>
                 <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
                   <div><label style={{fontSize:'0.7rem'}}>市場</label>
                     <select style={S.input} value={entry.type} onChange={e => setEntry({...entry, type:e.target.value})}>
-                      <option value="TW">台股</option><option value="US">美股</option><option value="cash">現金</option>
+                      <option value="TW">TW</option><option value="US">US</option><option value="cash">現金</option>
                     </select>
                   </div>
-                  <div><label style={{fontSize:'0.7rem'}}>代號/金額</label>
+                  <div><label style={{fontSize:'0.7rem'}}>代號 / 現金</label>
                     <input style={S.input} value={entry.type==='cash'?entry.cash:entry.symbol} onChange={e => entry.type==='cash'?setEntry({...entry, cash:e.target.value}):setEntry({...entry, symbol:e.target.value})} />
                   </div>
                 </div>
                 <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10}}>
-                  <div><label style={{fontSize:'0.7rem'}}>持有股數</label><input style={S.input} type="number" min="0" step="any" disabled={entry.type==='cash'} value={entry.shares} onChange={e => setEntry({...entry, shares:e.target.value})} /></div>
-                  <div><label style={{fontSize:'0.7rem'}}>自訂目標比例 (%)</label><input style={S.input} type="number" value={entry.targetPct} onChange={e => setEntry({...entry, targetPct:e.target.value})} /></div>
+                  <div><label style={{fontSize:'0.7rem'}}>股數</label><input style={S.input} type="number" min="0" step="any" disabled={entry.type==='cash'} value={entry.shares} onChange={e => setEntry({...entry, shares:e.target.value})} /></div>
+                  <div><label style={{fontSize:'0.7rem'}}>目標配置 (%)</label><input style={S.input} type="number" value={entry.targetPct} onChange={e => setEntry({...entry, targetPct:e.target.value})} /></div>
                 </div>
-                <button style={{...S.btn('primary'), width:'100%', marginTop:20}} onClick={handleAddEntry} disabled={loading}>{loading?'獲取中...':'加入清單'}</button>
+                <button style={{...S.btn('primary'), width:'100%', marginTop:20}} onClick={handleAddEntry} disabled={loading}>{loading ? '新增中...' : '加入投資組合'}</button>
               </div>
             </div>
 
             <div style={{...S.card, flex:1.5}}>
-              <h3>清單預覽</h3>
+              <h3>待加入資產</h3>
               {tempEntries.map(e => (
                 <div key={e.id} style={{display:'flex', justifyContent:'space-between', padding:'12px', borderBottom:'1px solid #1a3050'}}>
-                  <div><b>{e.symbol || 'CASH'}</b> - 目標 {e.targetPct}%</div>
+                  <div><b>{e.symbol || 'CASH'}</b> - 目前占比 {e.targetPct}%</div>
                   <div style={{display:'flex', gap:15, alignItems:'center'}}>
                     <span>NT$ {fmt(e.valueTWD)}</span>
-                    <button style={{...S.btn('danger'), padding:'4px 8px'}} onClick={()=>setTempEntries(tempEntries.filter(x=>x.id!==e.id))}>移除</button>
+                    <button style={{...S.btn('danger'), padding:'4px 8px'}} onClick={()=>setTempEntries(tempEntries.filter(x=>x.id!==e.id))}>刪除</button>
                   </div>
                 </div>
               ))}
@@ -591,7 +663,7 @@ export default function App() {
                 const total = tempEntries.reduce((s,x)=>s+x.valueTWD,0);
                 save([...portfolios, {id:Date.now(), name:pName, entries:tempEntries, totalTWD:total}]);
                 setTempEntries([]); setPName(""); setTab("portfolios");
-              }}>正式儲存投資組合</button>}
+              }}>建立投資組合</button>}
             </div>
           </div>
         )}
@@ -599,29 +671,52 @@ export default function App() {
         {tab === "history" && (
           <div style={S.card}>
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-              <h3 style={{margin:0}}>每日 14:00 資產總值快照歷史</h3>
+              <h3 style={{margin:0}}>每日 14:00 建立快照</h3>
               <div>
-                <button style={{...S.btn('primary'), marginRight:10}} onClick={manualSnapshot}>手動快照</button>
+                <button style={{...S.btn('primary'), marginRight:10}} onClick={manualSnapshot}>立即建立快照</button>
+                <button style={{...S.btn(), marginRight:10}} onClick={async () => {
+                  const date = window.prompt('請輸入快照日期 (YYYY-MM-DD):');
+                  if (!date) return;
+                  const d = new Date(date + 'T00:00:00');
+                  if (isNaN(d.getTime())) { window.alert('無效的日期格式'); return; }
+                  const existing = history.find(h => h.date === date);
+                  if (existing) { window.alert('該日期已存在快照'); return; }
+                  
+                  // ????????????????????????????????14:00????????????????????:00 (???????????)
+                  const taipeiTime = new Date(d.getTime() + 8 * 3600000); // ???????????
+                  const snapshotTime = new Date(taipeiTime);
+                  snapshotTime.setHours(14, 0, 0, 0); // ??????????? 14:00
+                  
+                  const pLocal = JSON.parse(localStorage.getItem('v6_p') || '[]');
+                  const snap = buildSnapshotFromPortfolios(pLocal);
+                  snap.date = date;
+                  snap.ts = snapshotTime.toISOString();
+                  
+                  const newH = [...history, snap];
+                  setHistory(newH);
+                  localStorage.setItem('v6_h', JSON.stringify(newH));
+                  window.alert('成功建立歷史快照');
+                }}>建立指定日期快照</button>
               </div>
             </div>
 
             <div style={{marginTop:12, marginBottom:12}}>
-              <h4 style={{margin:'6px 0'}}>快照列表</h4>
+              <h4 style={{margin:'6px 0'}}>快照詳細資訊</h4>
               <div style={{maxHeight:420, overflow:'auto', border:'1px solid #07111e', borderRadius:8, padding:6}}>
-                {history.slice().reverse().map(h => {
+                {history.slice().sort((a, b) => new Date(b.ts || b.date).getTime() - new Date(a.ts || a.date).getTime()).map(h => {
                   const key = (h.ts || h.date);
                   const isOpen = expandedHistory === key;
                   return (
                     <div key={key} style={{borderBottom:'1px solid #07111e', padding:'6px 8px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                       <div style={{display:'flex', gap:8, alignItems:'center'}}>
-                        <button style={{...S.btn('primary'), padding:'4px 8px'}} onClick={() => setExpandedHistory(isOpen ? null : key)}>{isOpen ? '收合' : '展開'}</button>
+                        <button style={{...S.btn('primary'), padding:'4px 8px'}} onClick={() => setExpandedHistory(isOpen ? null : key)}>{isOpen ? '隱藏' : '顯示'}</button>
                         <div style={{color:'#94a3b8'}}>{h.date} {h.ts ? new Date(h.ts).toLocaleTimeString() : ''}</div>
                       </div>
                       <div style={{display:'flex', gap:8, alignItems:'center'}}>
                         <div><b>NT$ {fmt(h.value)}</b></div>
                         <button style={{...S.btn('danger'), padding:'4px 8px'}} onClick={() => {
                           const sameDateCount = (history || []).filter(x => x.date === h.date).length;
-                          if (sameDateCount <= 1) { window.alert('當日僅剩一筆快照，無法刪除'); return; }
+                          if (sameDateCount <= 1) { window.alert('該日期必須至少保留一個快照'); return; }
                           const newH = history.filter(x => !(x.date === h.date && (x.ts || '') === (h.ts || '')));
                           setHistory(newH);
                           localStorage.setItem('v6_h', JSON.stringify(newH));
@@ -635,53 +730,163 @@ export default function App() {
             </div>
 
             {expandedHistory && (() => {
-              const all = history.slice().reverse();
+              const all = history.slice().sort((a, b) => new Date(b.ts || b.date).getTime() - new Date(a.ts || a.date).getTime());
               const sel = all.find(h => (h.ts || h.date) === expandedHistory);
               const h = sel || null;
               if (!h) return null;
               const fallbackP = JSON.parse(localStorage.getItem('v6_p') || '[]').map(p => ({ id: p.id, name: p.name, value: p.totalTWD || 0, entries: (p.entries||[]).map(e=>({ id: e.id, symbol: e.symbol, shares: e.shares, currentPrice: e.currentPrice, change: e.change, valueTWD: e.valueTWD, targetPct: e.targetPct })) }));
               const used = (h.breakdown && h.breakdown.length > 0) ? h.breakdown : fallbackP;
-              const note = (h.breakdown && h.breakdown.length > 0) ? null : (<div style={{color:'#94a3b8', fontSize:'0.8rem', marginBottom:8}}>※ 此快照無保存明細，顯示當前儲存的組合資料作為備援</div>);
+              const note = (h.breakdown && h.breakdown.length > 0) ? null : (<div style={{color:'#94a3b8', fontSize:'0.8rem', marginBottom:8}}>此快照不包含明細，因此顯示目前的投資組合資料作為替代。</div>);
               return (
                 <div style={{marginTop:12, ...S.card}}>
                   <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                    <div><b>快照明細</b> — {h.date} {h.ts ? new Date(h.ts).toLocaleString() : ''}</div>
-                    <div><button style={{...S.btn('danger')}} onClick={() => { setExpandedHistory(null); }}>收合</button></div>
+                    <div><b>快照資產</b> {h.date} {h.ts ? new Date(h.ts).toLocaleString() : ''}</div>
+                    <div><button style={{...S.btn('danger')}} onClick={() => { setExpandedHistory(null); }}>關閉</button></div>
                   </div>
                   <div style={{marginTop:8}}>
                     {note}
-                    <table style={{width:'100%', borderCollapse:'collapse'}}>
-                      <thead>
-                        <tr>
-                          <th style={{...S.th, padding:'8px'}}>組合</th>
-                          <th style={{...S.th, padding:'8px'}}>代號</th>
-                          <th style={{...S.th, padding:'8px'}}>持股數</th>
-                          <th style={{...S.th, padding:'8px'}}>目前市價</th>
-                          <th style={{...S.th, padding:'8px'}}>漲跌幅</th>
-                          <th style={{...S.th, padding:'8px'}}>價值 (TWD)</th>
-                        </tr>
-                      </thead>
+                    <div style={{width: '100%'}}>
+                      <table style={{width:'100%', borderCollapse:'collapse'}}>
+                        <thead>
+                          <tr>
+                            <th style={{...S.th, padding:'8px'}}>資產</th>
+                            <th style={{...S.th, padding:'8px'}}>代號</th>
+                            <th style={{...S.th, padding:'8px'}}>股數</th>
+                            <th style={{...S.th, padding:'8px'}}>價格</th>
+                            <th style={{...S.th, padding:'8px'}}>報酬率 %</th>
+                            <th style={{...S.th, padding:'8px'}}>價值 (TWD)</th>
+                            <th style={{...S.th, padding:'8px'}}>操作</th>
+                          </tr>
+                        </thead>
                       <tbody>
                         {used.map(b => (
                           <React.Fragment key={b.id}>
                             <tr style={{background:'#07111e'}}>
-                              <td style={{...S.td, padding:'8px'}} colSpan={6}><b>{b.name}</b> - NT$ {fmt(b.value)}</td>
+                              <td style={{...S.td, padding:'8px'}} colSpan={7}><b>{b.name}</b> - NT$ {fmt(b.value)}</td>
                             </tr>
-                            {(b.entries || []).map(en => (
-                              <tr key={en.id}>
-                                <td style={{...S.td, padding:'8px'}}></td>
-                                <td style={{...S.td, padding:'8px'}}>{en.symbol || 'CASH'}</td>
-                                <td style={{...S.td, padding:'8px'}}>{en.shares || '-'}</td>
-                                <td style={{...S.td, padding:'8px'}}>{en.currentPrice ? fmt(en.currentPrice,2) : '-'}</td>
-                                <td style={{...S.td, padding:'8px'}}><span style={{color: (en.change||0)>0? '#10b981' : (en.change||0)<0 ? '#ef4444' : '#94a3b8', fontWeight:700}}>{(en.change||0)>=0?'+':''}{Number((en.change||0).toFixed(2))}%</span></td>
-                                <td style={{...S.td, padding:'8px'}}>{fmt(en.valueTWD)}</td>
-                              </tr>
-                            ))}
+                            {(b.entries || []).map(en => {
+                              const isEditing = editingSnapshot && editingSnapshot.entryId === en.id && editingSnapshot.snapshotKey === key;
+                              return (
+                                <tr key={en.id}>
+                                  <td style={{...S.td, padding:'8px'}}></td>
+                                  <td style={{...S.td, padding:'8px'}}>{en.symbol || 'CASH'}</td>
+                                  <td style={{...S.td, padding:'8px'}}>
+                                    {isEditing ? (
+                                      <input 
+                                        style={{...S.input, width:'80px', padding:'4px'}} 
+                                        type="number" 
+                                        step="any" 
+                                        value={editingSnapshot.shares || ''} 
+                                        onChange={e => setEditingSnapshot({...editingSnapshot, shares: e.target.value})} 
+                                      />
+                                    ) : (
+                                      en.shares || '-'
+                                    )}
+                                  </td>
+                                  <td style={{...S.td, padding:'8px'}}>
+                                    {isEditing ? (
+                                      <input 
+                                        style={{...S.input, width:'80px', padding:'4px'}} 
+                                        type="number" 
+                                        step="0.01" 
+                                        value={editingSnapshot.price || ''} 
+                                        onChange={e => setEditingSnapshot({...editingSnapshot, price: e.target.value})} 
+                                      />
+                                    ) : (
+                                      en.currentPrice ? fmt(en.currentPrice,2) : '-'
+                                    )}
+                                  </td>
+                                  <td style={{...S.td, padding:'8px'}}>
+                                    {isEditing ? (
+                                      <span style={{color: (editingSnapshot.change||0)>0? '#10b981' : (editingSnapshot.change||0)<0 ? '#ef4444' : '#94a3b8', fontWeight:700}}>
+                                        {(editingSnapshot.change||0)>=0?'+':''}{Number((editingSnapshot.change||0).toFixed(2))}%
+                                      </span>
+                                    ) : (
+                                      <span style={{color: (en.change||0)>0? '#10b981' : (en.change||0)<0 ? '#ef4444' : '#94a3b8', fontWeight:700}}>
+                                        {(en.change||0)>=0?'+':''}{Number((en.change||0).toFixed(2))}%
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td style={{...S.td, padding:'8px'}}>
+                                    {isEditing ? (
+                                      fmt((Number(editingSnapshot.shares || 0) * Number(editingSnapshot.price || 0) * (en.type === 'US' ? usdtwd : 1)))
+                                    ) : (
+                                      fmt(en.valueTWD)
+                                    )}
+                                  </td>
+                                  <td style={{...S.td, padding:'8px'}}>
+                                    {isEditing ? (
+                                      <div style={{display:'flex', gap:'4px'}}>
+                                        <button 
+                                          style={{...S.btn('primary'), padding:'4px 8px', fontSize:'12px'}} 
+                                          onClick={() => {
+                                            // Compute price change from the previous price
+                                            const prevPrice = en.currentPrice || 0;
+                                            const newPrice = Number(editingSnapshot.price || 0);
+                                            const change = prevPrice !== 0 ? ((newPrice - prevPrice) / prevPrice) * 100 : 0;
+                                            
+                                            // ???????????????????
+                                            const updatedHistory = history.map(h => {
+                                              if ((h.ts || h.date) !== key) return h;
+                                              const updatedBreakdown = (h.breakdown || []).map(bd => {
+                                                if (bd.id !== b.id) return bd;
+                                                const updatedEntries = (bd.entries || []).map(ent => {
+                                                  if (ent.id !== en.id) return ent;
+                                                  const rate = ent.type === 'US' ? usdtwd : 1;
+                                                  const newValueTWD = Number(editingSnapshot.shares || 0) * newPrice * rate;
+                                                  return {
+                                                    ...ent,
+                                                    shares: editingSnapshot.shares,
+                                                    currentPrice: newPrice,
+                                                    change: change,
+                                                    valueTWD: newValueTWD
+                                                  };
+                                                });
+                                                const newTotal = updatedEntries.reduce((sum, ent) => sum + (ent.valueTWD || 0), 0);
+                                                return { ...bd, entries: updatedEntries, value: newTotal };
+                                              });
+                                              const newTotalValue = updatedBreakdown.reduce((sum, bd) => sum + (bd.value || 0), 0);
+                                              return { ...h, breakdown: updatedBreakdown, value: newTotalValue };
+                                            });
+                                            
+                                            setHistory(updatedHistory);
+                                            localStorage.setItem('v6_h', JSON.stringify(updatedHistory));
+                                            setEditingSnapshot(null);
+                                          }}
+                                        >
+                                          儲存
+                                        </button>
+                                        <button 
+                                          style={{...S.btn('danger'), padding:'4px 8px', fontSize:'12px'}} 
+                                          onClick={() => setEditingSnapshot(null)}
+                                        >
+                                          取消
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button 
+                                        style={{...S.btn('primary'), padding:'4px 8px', fontSize:'12px'}} 
+                                        onClick={() => setEditingSnapshot({
+                                          snapshotKey: key,
+                                          entryId: en.id,
+                                          shares: en.shares || '',
+                                          price: en.currentPrice || '',
+                                          change: en.change || 0
+                                        })}
+                                      >
+                                        Edit
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </React.Fragment>
                         ))}
                       </tbody>
                     </table>
                   </div>
+                </div>
                 </div>
               );
             })()}
@@ -690,30 +895,33 @@ export default function App() {
 
         {tab === "analysis" && (
           <div style={S.card}>
-            <h3>資產分析</h3>
+            <h3>分析</h3>
             <div style={{display:'flex', gap:12, alignItems:'center', marginBottom:12}}>
               <div>
-                <label style={{fontSize:'0.8rem', color:'#94a3b8'}}>時間粒度</label>
+                <label style={{fontSize:'0.8rem', color:'#94a3b8'}}>範圍</label>
                 <select style={{...S.input, width:160}} defaultValue={'month'} id="analysisGran">
-                  <option value="day">日</option>
-                  <option value="week">周</option>
+                  <option value="day">天</option>
+                  <option value="week">週</option>
                   <option value="month">月</option>
+                  <option value="3month">3個月</option>
+                  <option value="6month">6個月</option>
                   <option value="year">年</option>
+                  <option value="5year">5年</option>
                 </select>
               </div>
               <div>
-                <label style={{fontSize:'0.8rem', color:'#94a3b8'}}>分析對象</label>
+                <label style={{fontSize:'0.8rem', color:'#94a3b8'}}>目標</label>
                 <select style={{...S.input, width:220}} defaultValue={'total'} id="analysisTarget">
-                  <option value="total">全部組合 (總值)</option>
+                  <option value="total">所有資產</option>
                   {portfolios.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{fontSize:'0.8rem', color:'#94a3b8'}}>比較開始日</label>
+                <label style={{fontSize:'0.8rem', color:'#94a3b8'}}>開始日期</label>
                 <input id="analysisStart" type="date" style={{...S.input, width:160}} />
               </div>
               <div>
-                <label style={{fontSize:'0.8rem', color:'#94a3b8'}}>比較結束日</label>
+                <label style={{fontSize:'0.8rem', color:'#94a3b8'}}>結束日期</label>
                 <input id="analysisEnd" type="date" style={{...S.input, width:160}} />
               </div>
               <div>
@@ -723,7 +931,7 @@ export default function App() {
                   const start = document.getElementById('analysisStart').value;
                   const end = document.getElementById('analysisEnd').value;
                   setAnalysisConfig({ gran, target, start, end });
-                }}>產生分析</button>
+                }}>套用</button>
               </div>
             </div>
             <AnalysisChart history={history} portfolios={portfolios} config={analysisConfig} fmt={fmt} COLORS={COLORS} />
@@ -734,10 +942,10 @@ export default function App() {
   );
 }
 
-// 分析元件：根據快照與設定產生時間序列圖表
+// ???????????????????????????????????????????????????????????????????????????????????
 function AnalysisChart({ history, config, fmt, COLORS }) {
   const { gran = 'month', target = 'total', start, end } = config || {};
-  // 轉換 snapshot -> timeKey
+  // ????? snapshot -> timeKey
   const toKey = (isoTs) => {
     const d = new Date(isoTs);
     if (gran === 'day') return d.toISOString().split('T')[0];
@@ -748,6 +956,18 @@ function AnalysisChart({ history, config, fmt, COLORS }) {
       return `${y}-W${week}`;
     }
     if (gran === 'month') return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if (gran === '3month') {
+      const quarter = Math.floor((d.getMonth() + 3) / 3);
+      return `${d.getFullYear()}-Q${quarter}`;
+    }
+    if (gran === '6month') {
+      const half = d.getMonth() < 6 ? 1 : 2;
+      return `${d.getFullYear()}-H${half}`;
+    }
+    if (gran === '5year') {
+      const startYear = Math.floor(d.getFullYear() / 5) * 5;
+      return `${startYear}-${startYear + 4}`;
+    }
     return String(d.getFullYear());
   };
 
@@ -832,7 +1052,7 @@ function AnalysisChart({ history, config, fmt, COLORS }) {
       const priceChange = (L.currentPrice || 0) - (P.currentPrice || 0);
       const priceChangePct = (P.currentPrice && P.currentPrice !== 0) ? ((priceChange / P.currentPrice) * 100) : null;
       const valueChange = (L.value || 0) - (P.value || 0);
-      // 計算年化報酬率，需有 prev 與 latest 的時間戳與前期價值 > 0
+      // ????????????????????????prev ??latest ??????????????????> 0
       let annualizedPct = null;
       try {
         if (P.value && P.value !== 0 && L.value && L.value !== 0 && prev && prev.ts && latest && latest.ts) {
@@ -860,7 +1080,7 @@ function AnalysisChart({ history, config, fmt, COLORS }) {
 
   return (
     <div>
-      {data.length === 0 ? <div style={{color:'#94a3b8'}}>沒有可用快照資料</div> : (
+      {data.length === 0 ? <div style={{color:'#94a3b8'}}>沒有可供分析的歷史資料。</div> : (
       <div>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={data}>
@@ -873,36 +1093,68 @@ function AnalysisChart({ history, config, fmt, COLORS }) {
         </ResponsiveContainer>
 
         <div style={{marginTop:12}}>
-          <h4>比較（最近兩個時段）</h4>
-          {comparisonRows.length === 0 ? <div style={{color:'#94a3b8'}}>沒有足夠資料進行比較</div> : (
-            <table style={{width:'100%', borderCollapse:'collapse'}}>
-                  <thead>
-                <tr>
-                  <th style={S.th}>股票</th>
-                  <th style={S.th}>最新持股數</th>
-                  <th style={S.th}>股數變化</th>
-                  <th style={S.th}>市價變化</th>
-                  <th style={S.th}>漲跌幅</th>
-                  <th style={S.th}>最新價值</th>
-                  <th style={S.th}>價值變化</th>
-                  <th style={S.th}>年化報酬率</th>
-                </tr>
-              </thead>
+          <h4>資產比較</h4>
+          {comparisonRows.length === 0 ? <div style={{color:'#94a3b8'}}>尚無足夠資料來比較變更。</div> : (
+            <div style={{width: '100%'}}>
+              <table style={{width:'100%', borderCollapse:'collapse'}}>
+                    <thead>
+                  <tr>
+                    <th style={{...S.th}}>資產</th>
+                    <th style={{...S.th}}>最新股數</th>
+                    <th style={{...S.th}}>股數變動</th>
+                    <th style={{...S.th}}>價格變動</th>
+                    <th style={{...S.th}}>價格變動 %</th>
+                    <th style={{...S.th}}>最新價值</th>
+                    <th style={{...S.th}}>價值變動</th>
+                    <th style={{...S.th}}>年化報酬率</th>
+                  </tr>
+                </thead>
               <tbody>
                 {comparisonRows.map(r => (
                   <tr key={r.symbol}>
                     <td style={S.td}>{r.display || r.symbol}</td>
                     <td style={S.td}>{r.latestShares}</td>
-                    <td style={S.td}>{r.sharesChange>=0?'+':''}{r.sharesChange}</td>
-                    <td style={S.td}>{r.priceChange>=0?'+':''}{r.priceChange?fmt(r.priceChange,2):'-'}</td>
-                    <td style={S.td}>{r.priceChangePct!=null? (r.priceChangePct>=0?'+':'')+r.priceChangePct.toFixed(2)+'%' : '-'}</td>
+                    <td style={S.td}><span style={{color: r.sharesChange > 0 ? '#10b981' : r.sharesChange < 0 ? '#ef4444' : '#94a3b8'}}>{r.sharesChange>=0?'+':''}{r.sharesChange}</span></td>
+                    <td style={S.td}><span style={{color: r.priceChange > 0 ? '#10b981' : r.priceChange < 0 ? '#ef4444' : '#94a3b8'}}>{r.priceChange>=0?'+':''}{r.priceChange?fmt(r.priceChange,2):'-'}</span></td>
+                    <td style={S.td}><span style={{color: r.priceChangePct != null && r.priceChangePct > 0 ? '#10b981' : r.priceChangePct != null && r.priceChangePct < 0 ? '#ef4444' : '#94a3b8'}}>{r.priceChangePct!=null? (r.priceChangePct>=0?'+':'')+r.priceChangePct.toFixed(2)+'%' : '-'}</span></td>
                     <td style={S.td}>NT$ {fmt(r.latestValue)}</td>
-                    <td style={S.td}>{r.valueChange>=0?'+':''}NT$ {fmt(r.valueChange)}</td>
-                    <td style={S.td}>{r.annualizedPct!=null? (r.annualizedPct>=0?'+':'')+r.annualizedPct.toFixed(2)+'%' : '-'}</td>
+                    <td style={S.td}><span style={{color: r.valueChange > 0 ? '#10b981' : r.valueChange < 0 ? '#ef4444' : '#94a3b8'}}>{r.valueChange>=0?'+':''}NT$ {fmt(r.valueChange)}</span></td>
+                    <td style={S.td}><span style={{color: r.annualizedPct != null && r.annualizedPct > 0 ? '#10b981' : r.annualizedPct != null && r.annualizedPct < 0 ? '#ef4444' : '#94a3b8'}}>{r.annualizedPct!=null? (r.annualizedPct>=0?'+':'')+r.annualizedPct.toFixed(2)+'%' : '-'}</span></td>
                   </tr>
                 ))}
+                {/* ???????????????????? */}
+                {comparisonRows.length > 0 && (() => {
+                  const totalLatestValue = comparisonRows.reduce((sum, r) => sum + (r.latestValue || 0), 0);
+                  const totalValueChange = comparisonRows.reduce((sum, r) => sum + (r.valueChange || 0), 0);
+                  const totalPrevValue = totalLatestValue - totalValueChange;
+                  const totalChangePct = totalPrevValue !== 0 ? (totalValueChange / totalPrevValue) * 100 : 0;
+                  
+                  // Calculate weighted annualized return
+                  let totalWeightedAnnualized = 0;
+                  let totalWeight = 0;
+                  comparisonRows.forEach(r => {
+                    if (r.annualizedPct != null && r.latestValue > 0) {
+                      totalWeightedAnnualized += r.annualizedPct * r.latestValue;
+                      totalWeight += r.latestValue;
+                    }
+                  });
+                  const weightedAnnualizedPct = totalWeight > 0 ? totalWeightedAnnualized / totalWeight : null;
+                  return (
+                    <tr style={{borderTop: '2px solid #1a3050', backgroundColor: '#0c1a2e'}}>
+                      <td style={{...S.td, fontWeight: 'bold'}}>總計</td>
+                      <td style={S.td}>-</td>
+                      <td style={S.td}>-</td>
+                      <td style={S.td}>-</td>
+                      <td style={S.td}><span style={{color: totalChangePct > 0 ? '#10b981' : totalChangePct < 0 ? '#ef4444' : '#94a3b8', fontWeight: 'bold'}}>{totalChangePct>=0?'+':''}{totalChangePct.toFixed(2)}%</span></td>
+                      <td style={S.td}><b>NT$ {fmt(totalLatestValue)}</b></td>
+                      <td style={S.td}><span style={{color: totalValueChange > 0 ? '#10b981' : totalValueChange < 0 ? '#ef4444' : '#94a3b8', fontWeight: 'bold'}}>{totalValueChange>=0?'+':''}NT$ {fmt(totalValueChange)}</span></td>
+                      <td style={S.td}><span style={{color: weightedAnnualizedPct != null && weightedAnnualizedPct > 0 ? '#10b981' : weightedAnnualizedPct != null && weightedAnnualizedPct < 0 ? '#ef4444' : '#94a3b8', fontWeight: 'bold'}}>{weightedAnnualizedPct!=null? (weightedAnnualizedPct>=0?'+':'')+weightedAnnualizedPct.toFixed(2)+'%' : '-'}</span></td>
+                    </tr>
+                  );
+                })()}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>

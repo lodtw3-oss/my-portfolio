@@ -7,11 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "start:server": "node server/index.js",
-    "start:all": "concurrently \"npm:dev\" \"npm:start:server\"",
+    "start": "concurrently \"npm run dev\" \"npm run start:server\"",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "express": "^4.21.0",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

@@ -1,16 +1,141 @@
-# React + Vite
+# My Portfolio
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A portfolio tracking app built with React, Vite, Express, and Recharts.
 
-Currently, two official plugins are available:
+It supports Taiwan stocks, US stocks, cash assets, daily snapshots, historical analysis, and CSV import/export.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Features
 
-## React Compiler
+- Create multiple portfolios
+- Add Taiwan stocks, US stocks, and cash assets
+- Support cash in `TWD` and `USD`
+- Refresh live price and change data
+- Save automatic and manual snapshots
+- Analyze total assets or a single portfolio over time
+- Import and export portfolio data as CSV
+- Add new assets directly inside the portfolio detail view
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Stack
 
-## Expanding the ESLint configuration
+- Frontend: React 19, Vite, Recharts
+- Backend: Express
+- Price source: Yahoo Finance
+- Local storage: browser `localStorage`
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Run Locally
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start frontend and local quote proxy together:
+
+```bash
+npm start
+```
+
+Start frontend only:
+
+```bash
+npm run dev
+```
+
+Start backend proxy only:
+
+```bash
+npm run start:server
+```
+
+Default URLs:
+
+- Frontend: `http://localhost:5173`
+- Backend proxy: `http://localhost:4000`
+
+## Data Storage
+
+The app stores data in browser `localStorage`.
+
+- `v6_p`: portfolio data
+- `v6_h`: snapshot history
+
+If browser storage is cleared, all local data is removed.
+
+## Asset Types
+
+### Taiwan Stocks
+
+- `type = TW`
+- The app converts the symbol to Yahoo Finance format with `.TW`
+
+### US Stocks
+
+- `type = US`
+- Asset value is converted to TWD using the current `USD/TWD` rate
+
+### Cash
+
+- `type = cash`
+- Supports `TWD` and `USD`
+- `USD CASH` is converted to TWD using the current exchange rate
+
+## Snapshot Rules
+
+- A snapshot is created automatically every day at `14:00` Taipei time
+- A manual snapshot can be created in the history page
+- The analysis page compares snapshots across a selected time range
+
+## CSV Import and Export
+
+### Export
+
+The app exports two CSV files:
+
+- `portfolios_*.csv`: portfolio summary
+- `entries_*.csv`: asset detail rows
+
+### Import
+
+Supported formats:
+
+- Entry-based CSV format
+- Older format with an `entries` JSON column
+
+Imported data is normalized automatically, including:
+
+- asset ids
+- cash currency
+- TWD value conversion
+- portfolio total value
+
+## Quote Proxy
+
+Backend endpoint:
+
+```text
+GET /api/quote?symbol=XXX&market=TW|US
+```
+
+Purpose:
+
+- avoid browser CORS issues
+- normalize Taiwan and US stock symbols
+- return current price and percent change
+
+## Useful Commands
+
+```bash
+npm start
+npm run dev
+npm run start:server
+npm run lint
+npm run build
+```
+
+## Notes
+
+- Live market data is fetched from Yahoo Finance
+- Exchange rate data is fetched from `https://open.er-api.com/v6/latest/USD`
+- If displayed values look outdated, click `Refresh Live Data`
+- If the UI does not update, reload the page
