@@ -66,7 +66,8 @@ export default function App() {
   const [lastRetentionDate, setLastRetentionDate] = useState(null);
 
   // Build a snapshot from current portfolios
-  const buildSnapshotFromPortfolios = (pArray) => {
+  const buildSnapshotFromPortfolios = (pArray, tsOverride) => {
+    const tsNow = tsOverride || new Date().toISOString();
     const date = tsNow.split('T')[0];
     const breakdown = (pArray || []).map(p => ({
       id: p.id,
@@ -753,7 +754,7 @@ export default function App() {
                             <th style={{...S.th, padding:'8px'}}>代號</th>
                             <th style={{...S.th, padding:'8px'}}>股數</th>
                             <th style={{...S.th, padding:'8px'}}>價格</th>
-                            <th style={{...S.th, padding:'8px'}}>報酬率 %</th>
+                            <th style={{...S.th, padding:'8px'}}>漲跌幅 %</th>
                             <th style={{...S.th, padding:'8px'}}>價值 (TWD)</th>
                             <th style={{...S.th, padding:'8px'}}>操作</th>
                           </tr>
@@ -765,11 +766,22 @@ export default function App() {
                               <td style={{...S.td, padding:'8px'}} colSpan={7}><b>{b.name}</b> - NT$ {fmt(b.value)}</td>
                             </tr>
                             {(b.entries || []).map(en => {
-                              const isEditing = editingSnapshot && editingSnapshot.entryId === en.id && editingSnapshot.snapshotKey === key;
+                              const isEditing = editingSnapshot && editingSnapshot.entryId === en.id && editingSnapshot.snapshotKey === expandedHistory;
                               return (
                                 <tr key={en.id}>
                                   <td style={{...S.td, padding:'8px'}}></td>
-                                  <td style={{...S.td, padding:'8px'}}>{en.symbol || 'CASH'}</td>
+                                  <td style={{...S.td, padding:'8px'}}>
+                                    {isEditing ? (
+                                      <input 
+                                        style={{...S.input, width:'80px', padding:'4px'}} 
+                                        type="text" 
+                                        value={editingSnapshot.symbol || ''} 
+                                        onChange={e => setEditingSnapshot({...editingSnapshot, symbol: e.target.value.toUpperCase()})} 
+                                      />
+                                    ) : (
+                                      en.symbol || 'CASH'
+                                    )}
+                                  </td>
                                   <td style={{...S.td, padding:'8px'}}>
                                     {isEditing ? (
                                       <input 
@@ -798,9 +810,15 @@ export default function App() {
                                   </td>
                                   <td style={{...S.td, padding:'8px'}}>
                                     {isEditing ? (
-                                      <span style={{color: (editingSnapshot.change||0)>0? '#10b981' : (editingSnapshot.change||0)<0 ? '#ef4444' : '#94a3b8', fontWeight:700}}>
-                                        {(editingSnapshot.change||0)>=0?'+':''}{Number((editingSnapshot.change||0).toFixed(2))}%
-                                      </span>
+                                      <div style={{display:'flex', alignItems:'center'}}>
+                                        <input 
+                                          style={{...S.input, width:'70px', padding:'4px', marginRight:'4px'}} 
+                                          type="number" 
+                                          step="0.01" 
+                                          value={editingSnapshot.change || ''} 
+                                          onChange={e => setEditingSnapshot({...editingSnapshot, change: e.target.value})} 
+                                        />%
+                                      </div>
                                     ) : (
                                       <span style={{color: (en.change||0)>0? '#10b981' : (en.change||0)<0 ? '#ef4444' : '#94a3b8', fontWeight:700}}>
                                         {(en.change||0)>=0?'+':''}{Number((en.change||0).toFixed(2))}%
@@ -820,14 +838,12 @@ export default function App() {
                                         <button 
                                           style={{...S.btn('primary'), padding:'4px 8px', fontSize:'12px'}} 
                                           onClick={() => {
-                                            // Compute price change from the previous price
-                                            const prevPrice = en.currentPrice || 0;
                                             const newPrice = Number(editingSnapshot.price || 0);
-                                            const change = prevPrice !== 0 ? ((newPrice - prevPrice) / prevPrice) * 100 : 0;
+                                            const newChange = Number(editingSnapshot.change || 0);
                                             
                                             // ???????????????????
                                             const updatedHistory = history.map(h => {
-                                              if ((h.ts || h.date) !== key) return h;
+                                              if ((h.ts || h.date) !== expandedHistory) return h;
                                               const updatedBreakdown = (h.breakdown || []).map(bd => {
                                                 if (bd.id !== b.id) return bd;
                                                 const updatedEntries = (bd.entries || []).map(ent => {
@@ -836,9 +852,10 @@ export default function App() {
                                                   const newValueTWD = Number(editingSnapshot.shares || 0) * newPrice * rate;
                                                   return {
                                                     ...ent,
+                                                    symbol: editingSnapshot.symbol,
                                                     shares: editingSnapshot.shares,
                                                     currentPrice: newPrice,
-                                                    change: change,
+                                                    change: newChange,
                                                     valueTWD: newValueTWD
                                                   };
                                                 });
@@ -867,14 +884,15 @@ export default function App() {
                                       <button 
                                         style={{...S.btn('primary'), padding:'4px 8px', fontSize:'12px'}} 
                                         onClick={() => setEditingSnapshot({
-                                          snapshotKey: key,
+                                          snapshotKey: expandedHistory,
                                           entryId: en.id,
+                                          symbol: en.symbol || '',
                                           shares: en.shares || '',
                                           price: en.currentPrice || '',
                                           change: en.change || 0
                                         })}
                                       >
-                                        Edit
+                                        編輯
                                       </button>
                                     )}
                                   </td>
