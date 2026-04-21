@@ -196,27 +196,30 @@ export default function App() {
 
       if (response.ok) {
         console.log(`CSV saved to record folder: ${filename}`);
-        // ????????????????????????????????
-        // alert(`CSV?????????????????????????????????d???: ${filename}`);
+        alert(`CSV 成功儲存至伺服器 record 資料夾: ${filename}`);
       } else {
         console.error('Failed to save CSV to server');
         // fallback: download CSV directly in the browser
         const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = filename;
         a.click();
         URL.revokeObjectURL(url);
+        alert(`無法連線至伺服器，改透過瀏覽器直接下載 CSV: ${filename}`);
       }
     } catch (e) {
       console.error('Error saving CSV:', e);
       // fallback: download CSV directly in the browser
       const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
+      alert(`CSV 匯出下載完成: ${filename}`);
     }
   };
 
