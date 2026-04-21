@@ -934,6 +934,44 @@ export default function App() {
                 }}>套用</button>
               </div>
             </div>
+            <div style={{display:'flex', gap:8, flexWrap:'wrap', marginBottom:15}}>
+              <span style={{fontSize:'0.8rem', color:'#94a3b8', display:'flex', alignItems:'center', marginRight:8}}>快速區間:</span>
+              {[
+                {label: '1天', mode: 'day', amount: 1},
+                {label: '1週', mode: 'day', amount: 7},
+                {label: '1個月', mode: 'month', amount: 1},
+                {label: '3個月', mode: 'month', amount: 3},
+                {label: '6個月', mode: 'month', amount: 6},
+                {label: '1年', mode: 'year', amount: 1},
+                {label: '3年', mode: 'year', amount: 3},
+                {label: '5年', mode: 'year', amount: 5},
+              ].map(btn => (
+                <button
+                  key={btn.label}
+                  style={{...S.btn(), padding:'4px 10px', fontSize:'0.8rem', border:'1px solid #1a3050'}}
+                  onClick={() => {
+                    const end = new Date();
+                    const start = new Date(end);
+                    if (btn.mode === 'day') start.setDate(start.getDate() - btn.amount);
+                    if (btn.mode === 'month') start.setMonth(start.getMonth() - btn.amount);
+                    if (btn.mode === 'year') start.setFullYear(start.getFullYear() - btn.amount);
+                    
+                    const formatYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    const startStr = formatYMD(start);
+                    const endStr = formatYMD(end);
+                    
+                    document.getElementById('analysisStart').value = startStr;
+                    document.getElementById('analysisEnd').value = endStr;
+                    
+                    const gran = document.getElementById('analysisGran').value;
+                    const target = document.getElementById('analysisTarget').value;
+                    setAnalysisConfig({ gran, target, start: startStr, end: endStr });
+                  }}
+                >
+                  {btn.label}
+                </button>
+              ))}
+            </div>
             <AnalysisChart history={history} portfolios={portfolios} config={analysisConfig} fmt={fmt} COLORS={COLORS} />
           </div>
         )}
