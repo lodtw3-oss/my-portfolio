@@ -383,8 +383,9 @@ export default function App() {
       value: h.value,
       breakdown: JSON.stringify(h.breakdown || [])
     }));
+    const ts = new Date().toISOString().replace(/[:.]/g,'-');
     const csv = toCSV(rows, ['date','ts','value','breakdown']);
-    downloadCSV('snapshots.csv', csv);
+    downloadCSV(`snapshots_${ts}.csv`, csv);
   };
 
   // 匯出每日快照 CSV（下載到本機）
@@ -529,6 +530,65 @@ export default function App() {
     reader.readAsText(f, 'utf-8');
   };
 
+  const handleImportHistoryFile = (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const parsed = parseCSV(text);
+        if (!parsed || parsed.length === 0) throw new Error('empty');
+
+        const importedHistory = parsed.map((row, index) => {
+          const breakdown = (() => {
+            try {
+              return JSON.parse(row.breakdown || '[]');
+            } catch {
+              return [];
+            }
+          })();
+
+          const date = (row.date || '').trim();
+          const ts = (row.ts || '').trim();
+          const value = Number(row.value) || 0;
+          if (!date) throw new Error(`row ${index + 1} missing date`);
+
+          return {
+            date,
+            ts: ts || new Date(`${date}T14:00:00+08:00`).toISOString(),
+            value,
+            breakdown: Array.isArray(breakdown) ? breakdown : [],
+          };
+        });
+
+        const existingHistory = JSON.parse(localStorage.getItem("v6_h") || "[]");
+        const mergedHistoryMap = new Map();
+        [...(Array.isArray(existingHistory) ? existingHistory : []), ...importedHistory].forEach((item) => {
+          const dedupeKey = `${item.date}__${item.ts || ""}`;
+          if (!mergedHistoryMap.has(dedupeKey)) {
+            mergedHistoryMap.set(dedupeKey, item);
+          }
+        });
+
+        const mergedHistory = Array.from(mergedHistoryMap.values()).sort((a, b) =>
+          new Date(a.ts || `${a.date}T12:00:00+08:00`).getTime() -
+          new Date(b.ts || `${b.date}T12:00:00+08:00`).getTime()
+        );
+
+        setHistory(mergedHistory);
+        localStorage.setItem("v6_h", JSON.stringify(mergedHistory));
+        setExpandedHistory(null);
+        setTab('history');
+        alert('歷史紀錄已合併匯入並去除重複資料');
+      } catch {
+        alert('歷史紀錄匯入失敗，請確認 CSV 格式是否正確');
+      }
+      ev.target.value = '';
+    };
+    reader.readAsText(f, 'utf-8');
+  };
+
   // 手動快照：先更新即時市價，再建立快照
   const manualSnapshot = async () => {
     await manualRefresh();
@@ -649,7 +709,9 @@ export default function App() {
             <button style={{...S.btn()}} onClick={() => exportPortfoliosCSV()}>匯出投資組合 CSV</button>
             <button style={{...S.btn()}} onClick={() => exportHistoryCSV()}>匯出歷史紀錄 CSV</button>
             <input id="importPortfoliosInput" type="file" accept=".csv" style={{display:'none'}} onChange={handleImportPortfoliosFile} />
+            <input id="importHistoryInput" type="file" accept=".csv" style={{display:'none'}} onChange={handleImportHistoryFile} />
             <button style={{...S.btn()}} onClick={() => document.getElementById('importPortfoliosInput').click()}>匯入投資組合 CSV</button>
+            <button style={{...S.btn()}} onClick={() => document.getElementById('importHistoryInput').click()}>匯入歷史紀錄 CSV</button>
         </div>
       </header>
 
