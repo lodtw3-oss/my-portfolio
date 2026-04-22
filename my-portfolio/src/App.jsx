@@ -106,6 +106,7 @@ export default function App() {
 
     // Auto-create daily snapshots at 14:00 and run retention at 00:00 Taipei time
     const timer = setInterval(() => {
+      const now = Date.now();
       // Taipei time = UTC +8
       const taipeiNow = new Date(now + 8 * 3600000);
       const th = taipeiNow.getUTCHours();
