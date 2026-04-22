@@ -39,19 +39,32 @@ const isLocalDevHost = () => {
   return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 };
 
-async function fetchFinanceData(symbol, market) {
+async function fetchFinanceData(symbol, market, targetDate) {
   const clean = symbol.trim().toUpperCase();
   try {
     // Use local proxy to avoid browser CORS and protect API keys.
     const base = isLocalDevHost() ? "http://localhost:4000" : "";
-    const url = `${base}/api/quote?symbol=${encodeURIComponent(clean)}&market=${encodeURIComponent(market)}`;
+    const query = new URLSearchParams({
+      symbol: clean,
+      market: market || "US",
+    });
+    if (targetDate) query.set("date", targetDate);
+    const url = `${base}/api/quote?${query.toString()}`;
     const res = await fetch(url);
     const data = await res.json();
     if (!data) return null;
-    if (data.price !== undefined && data.price !== null) return { price: data.price, change: data.change };
+    if (data.price !== undefined && data.price !== null) {
+      return { price: data.price, change: data.change, asOfDate: data.asOfDate || targetDate || null };
+    }
     // fallback if proxy returns raw Yahoo result
     const meta = data.raw?.chart?.result?.[0]?.meta;
-    if (meta) return { price: meta.regularMarketPrice, change: ((meta.regularMarketPrice - meta.chartPreviousClose) / (meta.chartPreviousClose || 1)) * 100 };
+    if (meta) {
+      return {
+        price: meta.regularMarketPrice,
+        change: ((meta.regularMarketPrice - meta.chartPreviousClose) / (meta.chartPreviousClose || 1)) * 100,
+        asOfDate: targetDate || null,
+      };
+    }
     return null;
   } catch { return null; }
 }
@@ -96,6 +109,102 @@ export default function App() {
     }));
     const total = breakdown.reduce((s, x) => s + (x.value || 0), 0);
     return { date, ts: tsNow, value: total, breakdown };
+  };
+
+  const cloneSnapshotBreakdown = (snapshot) =>
+    (snapshot?.breakdown || []).map((portfolio) => ({
+      id: portfolio.id,
+      name: portfolio.name,
+      value: portfolio.value || 0,
+      entries: (portfolio.entries || []).map((entryItem) => ({
+        id: entryItem.id,
+        symbol: entryItem.symbol,
+        type: entryItem.type,
+        shares: entryItem.shares,
+        currentPrice: entryItem.currentPrice,
+        change: entryItem.change,
+        valueTWD: entryItem.valueTWD,
+        targetPct: entryItem.targetPct,
+      })),
+    }));
+
+  const createSnapshotForDate = async (targetDate) => {
+    const historyLocal = JSON.parse(localStorage.getItem("v6_h") || "[]");
+    const normalizedHistory = Array.isArray(historyLocal) ? historyLocal : [];
+    const previousDay = new Date(`${targetDate}T00:00:00+08:00`);
+    previousDay.setDate(previousDay.getDate() - 1);
+    const previousDate = previousDay.toLocaleDateString("en-CA", { timeZone: TAIPEI_TZ });
+
+    const sortedHistory = normalizedHistory
+      .slice()
+      .sort((a, b) => {
+        const ta = new Date(a.ts || `${a.date}T12:00:00+08:00`).getTime();
+        const tb = new Date(b.ts || `${b.date}T12:00:00+08:00`).getTime();
+        return tb - ta;
+      });
+
+    const sourceSnapshot =
+      sortedHistory.find((item) => item.date === previousDate) ||
+      sortedHistory.find((item) => item.date < targetDate);
+
+    if (!sourceSnapshot?.breakdown?.length) {
+      throw new Error("找不到指定日期前可沿用的歷史快照");
+    }
+
+    const sameDateSnapshots = normalizedHistory
+      .filter((item) => item.date === targetDate)
+      .map((item) => new Date(item.ts || `${item.date}T14:00:00+08:00`).getTime())
+      .filter((time) => !Number.isNaN(time))
+      .sort((a, b) => a - b);
+
+    const baseSnapshotTime = new Date(`${targetDate}T14:00:00+08:00`).getTime();
+    const latestSnapshotTime =
+      sameDateSnapshots.length > 0 ? sameDateSnapshots[sameDateSnapshots.length - 1] + 60 * 1000 : baseSnapshotTime;
+    const snapshotTime = new Date(latestSnapshotTime).toISOString();
+    const breakdown = await Promise.all(
+      cloneSnapshotBreakdown(sourceSnapshot).map(async (portfolio) => {
+        const entries = await Promise.all(
+          (portfolio.entries || []).map(async (entryItem) => {
+            if (entryItem.type === "cash" || !entryItem.symbol || entryItem.symbol === "CASH") {
+              const cashValue = Number(entryItem.valueTWD ?? entryItem.shares ?? 0);
+              return {
+                ...entryItem,
+                currentPrice: 1,
+                change: 0,
+                valueTWD: cashValue,
+              };
+            }
+
+            const quote = await fetchFinanceData(entryItem.symbol, entryItem.type, targetDate);
+            if (quote?.asOfDate && quote.asOfDate !== targetDate) {
+              throw new Error(`${entryItem.symbol} 找不到 ${targetDate} 的收盤資料`);
+            }
+            const price = Number(quote?.price ?? entryItem.currentPrice ?? 0);
+            const change = Number(quote?.change ?? entryItem.change ?? 0);
+            const shares = Number(entryItem.shares || 0);
+            const rate = entryItem.type === "US" ? usdtwd : 1;
+
+            return {
+              ...entryItem,
+              currentPrice: price,
+              change,
+              valueTWD: Number((shares * price * rate).toFixed(2)),
+            };
+          })
+        );
+
+        const value = entries.reduce((sum, entryItem) => sum + Number(entryItem.valueTWD || 0), 0);
+        return { ...portfolio, entries, value };
+      })
+    );
+
+    const value = breakdown.reduce((sum, portfolio) => sum + Number(portfolio.value || 0), 0);
+    return {
+      date: targetDate,
+      ts: snapshotTime,
+      value,
+      breakdown,
+    };
   };
   useEffect(() => {
     const p = localStorage.getItem("v6_p");
@@ -710,7 +819,7 @@ export default function App() {
             expandedHistory={expandedHistory}
             setExpandedHistory={setExpandedHistory}
             manualSnapshot={manualSnapshot}
-            buildSnapshotFromPortfolios={buildSnapshotFromPortfolios}
+            createSnapshotForDate={createSnapshotForDate}
             editingSnapshot={editingSnapshot}
             setEditingSnapshot={setEditingSnapshot}
             usdtwd={usdtwd}
