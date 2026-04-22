@@ -628,6 +628,14 @@ export default function App() {
 
   // Start editing an entry
   const startEditEntry = (pId, e) => {
+    setEditingEntry({
+      pId,
+      id: e.id,
+      type: e.type || 'TW',
+      symbol: e.symbol || '',
+      shares: e.shares ?? '',
+      targetPct: e.targetPct ?? 0,
+    });
   };
   const cancelEditEntry = () => setEditingEntry(null);
   const commitEditEntry = () => {
@@ -642,6 +650,11 @@ export default function App() {
       window.alert('持有股數/金額必須為非負數');
       return;
     }
+    const targetPctNum = Number(editingEntry.targetPct);
+    if (isNaN(targetPctNum) || targetPctNum < 0) {
+      window.alert('目標占比必須是大於或等於 0 的數字');
+      return;
+    }
     const updated = portfolios.map(p => {
       if (String(p.id) !== String(editingEntry.pId)) return p;
       const entries = (p.entries || []).map(en => {
@@ -651,7 +664,7 @@ export default function App() {
         let valueTWD = en.valueTWD || 0;
         if (en.type === 'cash') valueTWD = Number(newShares) || 0;
         else valueTWD = Number(newShares || 0) * (en.currentPrice || 0) * rate;
-        return { ...en, symbol: editingEntry.symbol, shares: newShares, valueTWD };
+        return { ...en, symbol: editingEntry.symbol, shares: newShares, targetPct: targetPctNum, valueTWD };
       });
       const total = entries.reduce((s, x) => s + (x.valueTWD || 0), 0);
       return { ...p, entries, totalTWD: total };
@@ -799,7 +812,16 @@ export default function App() {
                             <td style={S.td}>{e.currentPrice ? fmt(e.currentPrice,2) : '-'}</td>
                             <td style={S.td}><span style={{color: (e.change||0)>0? '#10b981' : (e.change||0)<0 ? '#ef4444' : '#94a3b8', fontWeight:700}}>{(e.change||0)>=0?'+':''}{Number((e.change||0).toFixed(2))}%</span></td>
                             <td style={S.td}>{actualPct.toFixed(1)}%</td>
-                            <td style={S.td}>{e.targetPct}%</td>
+                            <td style={S.td}>{isEditing ? (
+                              <input
+                                style={{...S.input, padding:'6px'}}
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={editingEntry.targetPct ?? ''}
+                                onChange={ev => setEditingEntry({...editingEntry, targetPct: ev.target.value})}
+                              />
+                            ) : `${e.targetPct}%`}</td>
                             <td style={S.td}><span style={S.gapBadge(gap)}>{gap > 0 ? "+" : ""}{gap.toFixed(1)}%</span></td>
                             <td style={S.td}>{fmt(e.valueTWD)}</td>
                             <td style={S.td}><span style={{color: estChangeTWD>0? '#10b981' : estChangeTWD<0 ? '#ef4444' : '#94a3b8', fontWeight:700}}>{estChangePct>=0?'+':''}{estChangePct.toFixed(2)}% ({fmt(estChangeTWD)})</span></td>
