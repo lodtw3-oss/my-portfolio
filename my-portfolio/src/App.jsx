@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, CartesianGrid
@@ -6,7 +6,7 @@ import {
 import AnalysisChart from "./components/AnalysisChart.jsx";
 import HistoryPanel from "./components/HistoryPanel.jsx";
 
-// ─── 1. 設定與樣式 ─────────────────────────────────────────────────────
+// ??? 1. 閮剖??見撘??????????????????????????????????????????????????????
 const COLORS = ["#38bdf8", "#818cf8", "#34d399", "#fb923c", "#f472b6", "#facc15", "#a78bfa", "#2dd4bf"];
 const TAIPEI_TZ = "Asia/Taipei";
 
@@ -28,7 +28,7 @@ const S = {
   gapBadge: (gap) => ({ padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", background: gap > 0 ? "#10b98133" : gap < 0 ? "#ef444433" : "transparent", color: gap > 0 ? "#10b981" : gap < 0 ? "#ef4444" : "#94a3b8", fontWeight: "bold" })
 };
 
-// ─── 2. 工具函式 ───────────────────────────────────────────────────────
+// ??? 2. 撌亙?賢? ???????????????????????????????????????????????????????
 const fmt = (v, d = 0) => new Intl.NumberFormat("zh-TW", { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
 
 const ymdInTaipei = (dateLike) =>
@@ -69,7 +69,7 @@ async function fetchFinanceData(symbol, market, targetDate) {
   } catch { return null; }
 }
 
-// ─── 3. 主程式 ─────────────────────────────────────────────────────────
+// ??? 3. 銝餌?撘??????????????????????????????????????????????????????????
 export default function App() {
   const [portfolios, setPortfolios] = useState([]);
   const [history, setHistory] = useState([]);
@@ -88,7 +88,7 @@ export default function App() {
   const [editingSnapshot, setEditingSnapshot] = useState(null);
   const [lastRetentionDate, setLastRetentionDate] = useState(null);
 
-  // 建立快照（日期以台北時區為準）
+  // 撱箇?敹怎嚗?誑?啣????箸?嚗?
   const buildSnapshotFromPortfolios = (pArray, tsOverride) => {
     const tsNow = tsOverride || new Date().toISOString();
     const date = ymdInTaipei(tsNow);
@@ -177,7 +177,7 @@ export default function App() {
 
             const quote = await fetchFinanceData(entryItem.symbol, entryItem.type, targetDate);
             if (quote?.asOfDate && quote.asOfDate !== targetDate) {
-              throw new Error(`${entryItem.symbol} 找不到 ${targetDate} 的收盤資料`);
+              throw new Error(entryItem.symbol + " 找不到 " + targetDate + " 的收盤價。");
             }
             const price = Number(quote?.price ?? entryItem.currentPrice ?? 0);
             const change = Number(quote?.change ?? entryItem.change ?? 0);
@@ -233,14 +233,14 @@ export default function App() {
       const taipeiDateStr = taipeiNow.toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).split(' ')[0];
 
       // Create a daily snapshot at 14:00 Taipei time
-      // 用 localStorage 記錄，避免重複觸發；並容錯 tm=0~2（避免 setInterval 漂移/背景節流錯過整點）
+      // ??localStorage 閮?嚗??銴孛?潘?銝血捆??tm=0~2嚗??setInterval 瞍宏/?蝭瘚?暺?
       if (th === 14 && tm <= 2) {
         const lastAuto = localStorage.getItem('v6_last_auto_snapshot_date') || '';
         if (lastAuto !== taipeiDateStr) {
           localStorage.setItem('v6_last_auto_snapshot_date', taipeiDateStr);
           (async () => {
             try {
-              await manualRefresh(); // 先抓最新市價
+              await manualRefresh(); // ????啣???
               const pLocalNow = JSON.parse(localStorage.getItem("v6_p") || "[]");
               const snap = buildSnapshotFromPortfolios(pLocalNow);
               const hLocal = JSON.parse(localStorage.getItem("v6_h") || "[]");
@@ -250,14 +250,14 @@ export default function App() {
               exportDailySnapshotCSV(snap);
             } catch (e) {
               console.error('auto snapshot error', e);
-              // 若失敗，讓今天還有機會在下一分鐘重試
+              // ?亙仃??霈?憭拚????銝????岫
               localStorage.removeItem('v6_last_auto_snapshot_date');
             }
           })();
         }
       }
 
-      // 每日台北 00:00 執行保留策略（只執行一次）
+      // 瘥?啣? 00:00 ?瑁?靽?蝑嚗?瑁?銝甈∴?
       const taipeiDateStrIso = taipeiNow.toISOString().split('T')[0];
       if (th === 0 && tm === 0 && lastRetentionDate !== taipeiDateStrIso) {
         // prev date (???????)
@@ -319,7 +319,7 @@ export default function App() {
 
   const downloadCSV = async (filename, content) => {
     try {
-      // 分析區預設日期：結束日為今日（台北），開始日為結束日前一年內最早有紀錄日
+      // ????身?交?嚗???箔??伐??啣?嚗????亦蝯??亙?銝撟游??拇?蝝?
       const base = (typeof window !== 'undefined' && window && window.location && window.location.hostname === 'localhost') ? 'http://localhost:4000' : '';
       const response = await fetch(`${base}/api/save-csv`, {
         method: 'POST',
@@ -331,7 +331,7 @@ export default function App() {
 
       if (response.ok) {
         console.log(`CSV saved to record folder: ${filename}`);
-        alert(`CSV 成功儲存至伺服器 record 資料夾: ${filename}`);
+        alert(`CSV 已儲存到 record 資料夾：${filename}`);
       } else {
         console.error('Failed to save CSV to server');
         // fallback: download CSV directly in the browser
@@ -342,7 +342,7 @@ export default function App() {
         a.download = filename;
         a.click();
         URL.revokeObjectURL(url);
-        alert(`無法連線至伺服器，改透過瀏覽器直接下載 CSV: ${filename}`);
+        alert(`無法連線到伺服器，已改為直接下載 CSV：${filename}`);
       }
     } catch (e) {
       console.error('Error saving CSV:', e);
@@ -354,7 +354,7 @@ export default function App() {
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
-      alert(`CSV 匯出下載完成: ${filename}`);
+      alert(`CSV 匯出完成：${filename}`);
     }
   };
 
@@ -388,13 +388,13 @@ export default function App() {
     downloadCSV(`snapshots_${ts}.csv`, csv);
   };
 
-  // 匯出每日快照 CSV（下載到本機）
+  // ?臬瘥敹怎 CSV嚗?頛?祆?嚗?
   const exportDailySnapshotCSV = (snap) => {
     if (!snap) return;
     const ts = new Date().toISOString().replace(/[:.]/g,'-');
     const filename = `daily_snapshot_${snap.date}_${ts}.csv`;
     
-    // 第一列：總覽
+    // 蝚砌???蝮質汗
     const rows = [{
       date: snap.date,
       timestamp: snap.ts,
@@ -402,7 +402,7 @@ export default function App() {
       portfolioCount: (snap.breakdown || []).length
     }];
     
-    // 後續列：組合與明細（依序展開）
+    // 敺???蝯???蝝堆?靘?撅?嚗?
     (snap.breakdown || []).forEach(p => {
       rows.push({
         portfolioId: p.id,
@@ -411,7 +411,7 @@ export default function App() {
         entryCount: (p.entries || []).length
       });
       
-      // 明細列：每個資產
+      // ?敦??瘥???
       (p.entries || []).forEach(e => {
         rows.push({
           entryId: e.id,
@@ -522,8 +522,8 @@ export default function App() {
         }
         save(newPortfolios);
         setTab('portfolios');
-        alert('匯入成功！');
-      } catch { alert('匯入失敗。請檢查檔案格式後再試一次。'); }
+        alert('匯入成功。');
+      } catch { alert('匯入失敗，請檢查 CSV 格式。'); }
       // reset input
       ev.target.value = '';
     };
@@ -580,16 +580,16 @@ export default function App() {
         localStorage.setItem("v6_h", JSON.stringify(mergedHistory));
         setExpandedHistory(null);
         setTab('history');
-        alert('歷史紀錄已合併匯入並去除重複資料');
+        alert('歷史紀錄匯入成功。');
       } catch {
-        alert('歷史紀錄匯入失敗，請確認 CSV 格式是否正確');
+        alert('歷史紀錄匯入失敗，請確認 CSV 格式是否正確。');
       }
       ev.target.value = '';
     };
     reader.readAsText(f, 'utf-8');
   };
 
-  // 手動快照：先更新即時市價，再建立快照
+  // ??敹怎嚗??湔?單?撣嚗?撱箇?敹怎
   const manualSnapshot = async () => {
     await manualRefresh();
     const pLocalNow = JSON.parse(localStorage.getItem('v6_p') || '[]');
@@ -638,48 +638,66 @@ export default function App() {
     });
   };
   const cancelEditEntry = () => setEditingEntry(null);
-  const commitEditEntry = () => {
+  const commitEditEntry = async () => {
     if (!editingEntry) return;
-    // 驗證 shares 必須為數字且 >= 0
+    // ??? shares ????????? >= 0
     const sharesNum = Number(editingEntry.shares);
     if (isNaN(sharesNum) || sharesNum < 0) {
-      window.alert('股數必須是大於或等於 0 的數字。');
+      window.alert('股數必須大於或等於 0。');
       return;
     }
     if (editingEntry.type !== 'cash' && (!editingEntry.symbol || editingEntry.symbol.trim() === '')) {
-      window.alert('持有股數/金額必須為非負數');
+      window.alert('非現金資產必須填寫代號。');
       return;
     }
     const targetPctNum = Number(editingEntry.targetPct);
     if (isNaN(targetPctNum) || targetPctNum < 0) {
-      window.alert('目標占比必須是大於或等於 0 的數字');
+      window.alert('目標配置必須大於或等於 0。');
       return;
     }
+    setLoading(true);
+    const quoteData =
+      editingEntry.type === "cash"
+        ? { price: 1, change: 0 }
+        : await fetchFinanceData(editingEntry.symbol, editingEntry.type);
     const updated = portfolios.map(p => {
       if (String(p.id) !== String(editingEntry.pId)) return p;
       const entries = (p.entries || []).map(en => {
         if (String(en.id) !== String(editingEntry.id)) return en;
         const newShares = editingEntry.shares;
-        const rate = en.type === 'US' ? usdtwd : 1;
+        const nextType = editingEntry.type || en.type;
+        const nextPrice = nextType === "cash" ? 1 : Number(quoteData?.price ?? en.currentPrice ?? 0);
+        const nextChange = Number(quoteData?.change ?? en.change ?? 0);
+        const rate = nextType === 'US' ? usdtwd : 1;
         let valueTWD = en.valueTWD || 0;
-        if (en.type === 'cash') valueTWD = Number(newShares) || 0;
-        else valueTWD = Number(newShares || 0) * (en.currentPrice || 0) * rate;
-        return { ...en, symbol: editingEntry.symbol, shares: newShares, targetPct: targetPctNum, valueTWD };
+        if (nextType === 'cash') valueTWD = Number(newShares) || 0;
+        else valueTWD = Number(newShares || 0) * nextPrice * rate;
+        return {
+          ...en,
+          type: nextType,
+          symbol: editingEntry.symbol,
+          shares: newShares,
+          currentPrice: nextPrice,
+          change: nextChange,
+          targetPct: targetPctNum,
+          valueTWD,
+        };
       });
       const total = entries.reduce((s, x) => s + (x.valueTWD || 0), 0);
       return { ...p, entries, totalTWD: total };
     });
     save(updated);
+    setLoading(false);
     setEditingEntry(null);
   };
 
-  // 組合名稱編輯
+  // 蝯??迂蝺刻摩
   const startEditPortfolio = (p) => setEditingPortfolio({ id: p.id, name: p.name });
   const cancelEditPortfolio = () => setEditingPortfolio(null);
   const commitEditPortfolio = () => {
     if (!editingPortfolio) return;
     if (!editingPortfolio.name || editingPortfolio.name.trim() === '') {
-      window.alert('組合名稱不可為空');
+      window.alert('投資組合名稱不可為空。');
       return;
     }
     const updated = portfolios.map(p => p.id === editingPortfolio.id ? { ...p, name: editingPortfolio.name } : p);
@@ -688,16 +706,16 @@ export default function App() {
   };
 
   const handleAddEntry = async () => {
-    // 驗證輸入
+    // 撽?頛詨
     if (entry.type !== "cash") {
       if (!entry.symbol || entry.symbol.trim() === '') { window.alert('股票代號不可為空'); return; }
-      if (isNaN(Number(entry.shares)) || Number(entry.shares) <= 0) { window.alert('Shares must be greater than 0.'); return; }
+      if (isNaN(Number(entry.shares)) || Number(entry.shares) <= 0) { window.alert('股數必須大於 0。'); return; }
     } else {
-      if (isNaN(Number(entry.cash)) || Number(entry.cash) <= 0) { window.alert('Cash amount must be greater than 0.'); return; }
+      if (isNaN(Number(entry.cash)) || Number(entry.cash) <= 0) { window.alert('現金金額必須大於 0。'); return; }
     }
     setLoading(true);
     const data = await fetchFinanceData(entry.symbol, entry.type);
-    const price = data?.price ?? (entry.type === "cash" ? 1 : Number(window.prompt("抓取失敗，請輸入價格:")));
+    const price = data?.price ?? (entry.type === "cash" ? 1 : Number(window.prompt("抓取失敗，請手動輸入價格：")));
     
     if (price) {
       const rate = entry.type === "US" ? usdtwd : 1;
@@ -729,10 +747,10 @@ export default function App() {
       </header>
 
       <nav style={S.nav}>
-        <button style={S.navBtn(tab === "add")} onClick={() => setTab("add")}>新增資產</button>
-        <button style={S.navBtn(tab === "portfolios")} onClick={() => setTab("portfolios")}>投資組合</button>
-        <button style={S.navBtn(tab === "history")} onClick={() => setTab("history")}>歷史紀錄</button>
-        <button style={S.navBtn(tab === "analysis")} onClick={() => setTab("analysis")}>分析</button>
+        <button style={S.navBtn(tab === "add")} onClick={() => setTab("add")}>{"\u65b0\u589e\u8cc7\u7522"}</button>
+        <button style={S.navBtn(tab === "portfolios")} onClick={() => setTab("portfolios")}>{"\u6295\u8cc7\u7d44\u5408"}</button>
+        <button style={S.navBtn(tab === "history")} onClick={() => setTab("history")}>{"\u6b77\u53f2\u7d00\u9304"}</button>
+        <button style={S.navBtn(tab === "analysis")} onClick={() => setTab("analysis")}>{"\u5206\u6790"}</button>
       </nav>
 
       <main style={S.content}>
@@ -749,19 +767,19 @@ export default function App() {
                     )}
                     {editingPortfolio && String(editingPortfolio.id) === String(p.id) ? (
                       <>
-                        <button style={{...S.btn('primary'), padding:'6px 10px'}} onClick={commitEditPortfolio}>儲存</button>
-                        <button style={{...S.btn('danger'), padding:'6px 10px'}} onClick={cancelEditPortfolio}>取消</button>
+                        <button style={{...S.btn('primary'), padding:'6px 10px'}} onClick={commitEditPortfolio}>{'\u5132\u5b58'}</button>
+                        <button style={{...S.btn('danger'), padding:'6px 10px'}} onClick={cancelEditPortfolio}>{'\u53d6\u6d88'}</button>
                       </>
                     ) : (
-                      <button style={{...S.btn('primary'), padding:'6px 10px'}} onClick={() => startEditPortfolio(p)}>編輯名稱</button>
+                      <button style={{...S.btn('primary'), padding:'6px 10px'}} onClick={() => startEditPortfolio(p)}>{'\u7de8\u8f2f\u540d\u7a31'}</button>
                     )}
                   </div>
-                  <button style={S.btn('danger')} onClick={() => save(portfolios.filter(x=>x.id!==p.id))}>刪除</button>
+                  <button style={S.btn('danger')} onClick={() => save(portfolios.filter(x=>x.id!==p.id))}>{'\u522a\u9664'}</button>
                 </div>
                 <div style={{fontSize:'2rem', fontWeight:900, color:'#38bdf8'}}>NT$ {fmt(p.totalTWD)}</div>
                 
                  <button style={{...S.btn('primary'), width:'100%', marginTop:15}} onClick={() => setExpandedAll(!expandedAll)}>
-                   {expandedAll ? "收合" : "展開所有資產"}
+                   {expandedAll ? '\u6536\u5408\u660e\u7d30' : '\u5c55\u958b\u660e\u7d30'}
                  </button>
 
                  {expandedAll && (
@@ -769,16 +787,17 @@ export default function App() {
                     <table style={{...S.table}}>
                       <thead>
                         <tr>
+                          <th style={{...S.th}}>市場</th>
                           <th style={{...S.th}}>代號</th>
-                          <th style={{...S.th}}>持有數</th>
+                          <th style={{...S.th}}>股數</th>
                           <th style={{...S.th}}>現價</th>
-                          <th style={{...S.th}}>報酬率 %</th>
-                          <th style={{...S.th}}>目前占比 %</th>
-                          <th style={{...S.th}}>目標占比 %</th>
-                          <th style={{...S.th}}>差距</th>
-                          <th style={{...S.th}}>價值 (TWD)</th>
-                          <th style={{...S.th}}>預估變動</th>
-                          <th style={{...S.th}}>建議股數</th>
+                          <th style={{...S.th}}>漲跌幅 %</th>
+                          <th style={{...S.th}}>實際配置 %</th>
+                          <th style={{...S.th}}>目標配置 %</th>
+                          <th style={{...S.th}}>偏離</th>
+                          <th style={{...S.th}}>市值 (TWD)</th>
+                          <th style={{...S.th}}>預估損益</th>
+                          <th style={{...S.th}}>建議調整</th>
                           <th style={{...S.th}}>操作</th>
                         </tr>
                       </thead>
@@ -794,15 +813,26 @@ export default function App() {
                           const desiredShares = desiredValue / (e.currentPrice * rate);
                           const currentShares = Number(e.shares) || 0;
                           const delta = desiredShares - currentShares;
-                          suggestedNum = Math.round(delta); // 取整建議股數
+                          suggestedNum = Math.round(delta); // ?撱箄降?⊥
                           suggestedText = (suggestedNum >= 0 ? '+' : '') + suggestedNum;
                         }
-                        // 資產分析：估計價值變動（以當日變動百分比計算）
+                        // 鞈??嚗摯閮?潸???隞亦?亥????閮?嚗?
                         const estChangePct = e.change || 0;
                         const estChangeTWD = e.valueTWD * (estChangePct / 100);
                         const isEditing = editingEntry && String(editingEntry.id) === String(e.id) && String(editingEntry.pId) === String(p.id);
                         return (
                           <tr key={e.id}>
+                            <td style={S.td}>{isEditing ? (
+                              <select
+                                style={{...S.input, padding:'6px'}}
+                                value={editingEntry.type || 'TW'}
+                                onChange={ev => setEditingEntry({...editingEntry, type: ev.target.value})}
+                              >
+                                <option value="TW">TW</option>
+                                <option value="US">US</option>
+                                <option value="cash">{"\u73fe\u91d1"}</option>
+                              </select>
+                            ) : (<span>{e.type}</span>)}</td>
                             <td style={S.td}>{isEditing ? (
                               <input style={{...S.input, padding:'6px'}} value={editingEntry.symbol || ''} onChange={ev => setEditingEntry({...editingEntry, symbol: ev.target.value})} />
                             ) : (<b>{e.symbol || 'CASH'}</b>)}</td>
@@ -829,11 +859,11 @@ export default function App() {
                             <td style={S.td}>
                               {isEditing ? (
                                 <div style={{display:'flex', gap:8}}>
-                                  <button style={{...S.btn('primary'), padding:'6px 10px'}} onClick={commitEditEntry}>儲存</button>
-                                  <button style={{...S.btn('danger'), padding:'6px 10px'}} onClick={cancelEditEntry}>取消</button>
+                                  <button style={{...S.btn('primary'), padding:'6px 10px'}} onClick={commitEditEntry}>{'\u5132\u5b58'}</button>
+                                  <button style={{...S.btn('danger'), padding:'6px 10px'}} onClick={cancelEditEntry}>{'\u53d6\u6d88'}</button>
                                 </div>
                               ) : (
-                                <button style={{...S.btn('primary'), padding:'6px 10px'}} onClick={() => startEditEntry(p.id, e)}>編輯</button>
+                                <button style={{...S.btn('primary'), padding:'6px 10px'}} onClick={() => startEditEntry(p.id, e)}>{'\u7de8\u8f2f'}</button>
                               )}
                             </td>
                           </tr>
@@ -851,37 +881,37 @@ export default function App() {
         {tab === "add" && (
           <div style={{display:'flex', gap:'24px'}}>
             <div style={{...S.card, flex:1}}>
-              <h3>1. 建立投資組合</h3>
+              <h3>{"1. \u5efa\u7acb\u6295\u8cc7\u7d44\u5408"}</h3>
               <input style={{...S.input, marginBottom:20}} value={pName} onChange={e => setPName(e.target.value)} placeholder="輸入投資組合名稱" />
               
               <div style={{background:'#07111e', padding:20, borderRadius:8}}>
-                <h4 style={{marginTop:0}}>2. 新增資產</h4>
+                <h4 style={{marginTop:0}}>{"2. \u65b0\u589e\u8cc7\u7522"}</h4>
                 <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                  <div><label style={{fontSize:'0.7rem'}}>市場</label>
+                  <div><label style={{fontSize:'0.7rem'}}>{'\u5e02\u5834'}</label>
                     <select style={S.input} value={entry.type} onChange={e => setEntry({...entry, type:e.target.value})}>
-                      <option value="TW">TW</option><option value="US">US</option><option value="cash">現金</option>
+                      <option value="TW">TW</option><option value="US">US</option><option value="cash">{"\u73fe\u91d1"}</option>
                     </select>
                   </div>
-                  <div><label style={{fontSize:'0.7rem'}}>代號 / 現金</label>
+                  <div><label style={{fontSize:'0.7rem'}}>{'\u4ee3\u865f / \u73fe\u91d1'}</label>
                     <input style={S.input} value={entry.type==='cash'?entry.cash:entry.symbol} onChange={e => entry.type==='cash'?setEntry({...entry, cash:e.target.value}):setEntry({...entry, symbol:e.target.value})} />
                   </div>
                 </div>
                 <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10}}>
-                  <div><label style={{fontSize:'0.7rem'}}>股數</label><input style={S.input} type="number" min="0" step="any" disabled={entry.type==='cash'} value={entry.shares} onChange={e => setEntry({...entry, shares:e.target.value})} /></div>
-                  <div><label style={{fontSize:'0.7rem'}}>目標配置 (%)</label><input style={S.input} type="number" value={entry.targetPct} onChange={e => setEntry({...entry, targetPct:e.target.value})} /></div>
+                  <div><label style={{fontSize:'0.7rem'}}>{'\u80a1\u6578'}</label><input style={S.input} type="number" min="0" step="any" disabled={entry.type==='cash'} value={entry.shares} onChange={e => setEntry({...entry, shares:e.target.value})} /></div>
+                  <div><label style={{fontSize:'0.7rem'}}>{'\u76ee\u6a19\u914d\u7f6e (%)'}</label><input style={S.input} type="number" value={entry.targetPct} onChange={e => setEntry({...entry, targetPct:e.target.value})} /></div>
                 </div>
-                <button style={{...S.btn('primary'), width:'100%', marginTop:20}} onClick={handleAddEntry} disabled={loading}>{loading ? '新增中...' : '加入投資組合'}</button>
+                <button style={{...S.btn('primary'), width:'100%', marginTop:20}} onClick={handleAddEntry} disabled={loading}>{loading ? '\u65b0\u589e\u4e2d...' : '\u52a0\u5165\u6295\u8cc7\u7d44\u5408'}</button>
               </div>
             </div>
 
             <div style={{...S.card, flex:1.5}}>
-              <h3>待加入資產</h3>
+              <h3>{"\u5f85\u52a0\u5165\u8cc7\u7522"}</h3>
               {tempEntries.map(e => (
                 <div key={e.id} style={{display:'flex', justifyContent:'space-between', padding:'12px', borderBottom:'1px solid #1a3050'}}>
-                  <div><b>{e.symbol || 'CASH'}</b> - 目前占比 {e.targetPct}%</div>
+                  <div><b>{e.symbol || 'CASH'}</b> - {'\u76ee\u6a19\u914d\u7f6e'} {e.targetPct}%</div>
                   <div style={{display:'flex', gap:15, alignItems:'center'}}>
                     <span>NT$ {fmt(e.valueTWD)}</span>
-                    <button style={{...S.btn('danger'), padding:'4px 8px'}} onClick={()=>setTempEntries(tempEntries.filter(x=>x.id!==e.id))}>刪除</button>
+                    <button style={{...S.btn('danger'), padding:'4px 8px'}} onClick={()=>setTempEntries(tempEntries.filter(x=>x.id!==e.id))}>{'\u522a\u9664'}</button>
                   </div>
                 </div>
               ))}
@@ -889,7 +919,7 @@ export default function App() {
                 const total = tempEntries.reduce((s,x)=>s+x.valueTWD,0);
                 save([...portfolios, {id:Date.now(), name:pName, entries:tempEntries, totalTWD:total}]);
                 setTempEntries([]); setPName(""); setTab("portfolios");
-              }}>建立投資組合</button>}
+              }}>{"\u5efa\u7acb\u6295\u8cc7\u7d44\u5408"}</button>}
             </div>
           </div>
         )}
@@ -913,33 +943,33 @@ export default function App() {
 
         {tab === "analysis" && (
           <div style={S.card}>
-            <h3>分析</h3>
+            <h3>{"\u5206\u6790"}</h3>
             <div style={{display:'flex', gap:12, alignItems:'center', marginBottom:12}}>
               <div>
-                <label style={{fontSize:'0.8rem', color:'#94a3b8'}}>範圍</label>
+                <label style={{fontSize:'0.8rem', color:'#94a3b8'}}>{'\u7bc4\u570d'}</label>
                 <select style={{...S.input, width:160}} defaultValue={'day'} id="analysisGran">
-                  <option value="day">天</option>
-                  <option value="week">週</option>
-                  <option value="month">月</option>
-                  <option value="3month">3個月</option>
-                  <option value="6month">6個月</option>
-                  <option value="year">年</option>
-                  <option value="5year">5年</option>
+                  <option value="day">{"\u5929"}</option>
+                  <option value="week">{"\u9031"}</option>
+                  <option value="month">{"\u6708"}</option>
+                  <option value="3month">{"3 \u500b\u6708"}</option>
+                  <option value="6month">{"6 \u500b\u6708"}</option>
+                  <option value="year">{"\u5e74"}</option>
+                  <option value="5year">{"5 \u5e74"}</option>
                 </select>
               </div>
               <div>
-                <label style={{fontSize:'0.8rem', color:'#94a3b8'}}>目標</label>
+                <label style={{fontSize:'0.8rem', color:'#94a3b8'}}>{'\u76ee\u6a19'}</label>
                 <select style={{...S.input, width:220}} defaultValue={'total'} id="analysisTarget">
-                  <option value="total">所有資產</option>
+                  <option value="total">{"\u7e3d\u8cc7\u7522"}</option>
                   {portfolios.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{fontSize:'0.8rem', color:'#94a3b8'}}>開始日期</label>
+                <label style={{fontSize:'0.8rem', color:'#94a3b8'}}>{'\u958b\u59cb\u65e5\u671f'}</label>
                 <input id="analysisStart" type="date" style={{...S.input, width:160}} />
               </div>
               <div>
-                <label style={{fontSize:'0.8rem', color:'#94a3b8'}}>結束日期</label>
+                <label style={{fontSize:'0.8rem', color:'#94a3b8'}}>{'\u7d50\u675f\u65e5\u671f'}</label>
                 <input id="analysisEnd" type="date" style={{...S.input, width:160}} />
               </div>
               <div>
@@ -949,20 +979,20 @@ export default function App() {
                   const start = document.getElementById('analysisStart').value;
                   const end = document.getElementById('analysisEnd').value;
                   setAnalysisConfig({ gran, target, start, end });
-                }}>套用</button>
+                }}>{"\u5957\u7528"}</button>
               </div>
             </div>
             <div style={{display:'flex', gap:8, flexWrap:'wrap', marginBottom:15}}>
-              <span style={{fontSize:'0.8rem', color:'#94a3b8', display:'flex', alignItems:'center', marginRight:8}}>快速區間:</span>
+              <span style={{fontSize:'0.8rem', color:'#94a3b8', display:'flex', alignItems:'center', marginRight:8}}>{'\u5feb\u901f\u5340\u9593'}</span>
               {[
-                {label: '1天', mode: 'day', amount: 1},
-                {label: '1週', mode: 'day', amount: 7},
-                {label: '1個月', mode: 'month', amount: 1},
-                {label: '3個月', mode: 'month', amount: 3},
-                {label: '6個月', mode: 'month', amount: 6},
-                {label: '1年', mode: 'year', amount: 1},
-                {label: '3年', mode: 'year', amount: 3},
-                {label: '5年', mode: 'year', amount: 5},
+                {label: '\u0031 \u5929', mode: 'day', amount: 1},
+                {label: '\u0031 \u9031', mode: 'day', amount: 7},
+                {label: '\u0031 \u500b\u6708', mode: 'month', amount: 1},
+                {label: '\u0033 \u500b\u6708', mode: 'month', amount: 3},
+                {label: '\u0036 \u500b\u6708', mode: 'month', amount: 6},
+                {label: '\u0031 \u5e74', mode: 'year', amount: 1},
+                {label: '\u0033 \u5e74', mode: 'year', amount: 3},
+                {label: '\u0035 \u5e74', mode: 'year', amount: 5},
               ].map(btn => (
                 <button
                   key={btn.label}
@@ -999,3 +1029,6 @@ export default function App() {
 }
 
 // AnalysisChart moved to src/components/AnalysisChart.jsx
+
+
+
